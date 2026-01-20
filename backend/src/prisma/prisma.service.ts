@@ -1,12 +1,19 @@
 import { Injectable, OnModuleInit } from '@nestjs/common';
 import { PrismaClient } from '@prisma/client';
+import { PrismaPg } from '@prisma/adapter-pg';
+import { Pool } from 'pg';
 
 @Injectable()
 export class PrismaService extends PrismaClient implements OnModuleInit {
   constructor() {
-    super({
-      log: ['info', 'warn', 'error'],
-    });
+    const databaseUrl = process.env.DATABASE_URL;
+    console.log('DATABASE_URL:', databaseUrl ? 'SET' : 'NOT SET');
+    if (!databaseUrl) {
+      throw new Error('DATABASE_URL 환경변수가 설정되지 않았습니다.');
+    }
+    const pool = new Pool({ connectionString: databaseUrl as string });
+    const adapter = new PrismaPg(pool);
+    super({ adapter });
   }
 
   async onModuleInit() {
