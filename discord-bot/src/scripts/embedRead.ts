@@ -1,5 +1,3 @@
-import { Timestamp } from './../../../backend/node_modules/@angular-devkit/core/node_modules/rxjs/dist/types/internal/types.d';
-import { name } from './../../../backend/node_modules/ci-info/index.d';
 import { Client, GatewayIntentBits, ChannelType, TextChannel } from 'discord.js';
 import dotenv from 'dotenv';
 
