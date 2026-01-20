@@ -107,8 +107,6 @@ async function seedUsers(members: Collection<string, GuildMember>) {
         console.log(`  ⏭️ ${username} (이미 존재)`);
       } else {
         console.error(`  ❌ ${username} 실패:`, error.message);
-        console.error(`     Status: ${error.response?.status}`);
-        console.error(`     Data:`, error.response?.data);
       }
     }
   }
