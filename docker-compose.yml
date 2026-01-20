@@ -105,7 +105,7 @@ services:
       BOOKS_CHANNEL_ID: ${BOOKS_CHANNEL_ID}
       DIGGING_CHANNEL_ID: ${DIGGING_CHANNEL_ID}
       TABLE_LOG_CHANNEL_ID: ${TABLE_LOG_CHANNEL_ID}
-      BACKEND_API_URL: https://backend:3000
+      BACKEND_API_URL: http://backend:3000
     networks:
       - boogibooks-net
 
