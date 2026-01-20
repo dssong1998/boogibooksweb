@@ -44,7 +44,8 @@ export class SeedController {
           coins: data.coins || 0,
         },
       });
-    } catch {
+    } catch (error) {
+      console.error('User seed error:', error);
       throw new HttpException('User seed failed', HttpStatus.INTERNAL_SERVER_ERROR);
     }
   }
@@ -157,7 +158,8 @@ export class SeedController {
           createdAt: data.createdAt ? new Date(data.createdAt) : new Date(),
         },
       });
-    } catch {
+    } catch (error) {
+      console.error('Comment seed error:', error);
       throw new HttpException('Comment seed failed', HttpStatus.INTERNAL_SERVER_ERROR);
     }
   }
