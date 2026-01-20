@@ -33,4 +33,5 @@ COPY --from=builder /app/dist ./dist
 ENV NODE_ENV=production
 EXPOSE 3000
 
-CMD ["node", "dist/src/main.js"]
+# 시작 시 DB 마이그레이션 후 서버 실행
+CMD ["sh", "-c", "npx prisma db push --skip-generate && node dist/src/main.js"]
