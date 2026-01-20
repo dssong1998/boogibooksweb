@@ -34,4 +34,4 @@ ENV NODE_ENV=production
 EXPOSE 3000
 
 # 시작 시 DB 마이그레이션 후 서버 실행
-CMD ["sh", "-c", "npx prisma db push --accept-data-loss && node dist/src/main.js"]
+CMD ["sh", "-c", "npx prisma db push --accept-data-loss --url \"$DATABASE_URL\" && node dist/src/main.js"]
