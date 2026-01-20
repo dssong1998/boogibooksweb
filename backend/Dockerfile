@@ -11,7 +11,9 @@ RUN npm ci
 
 # Prisma 스키마 복사 및 클라이언트 생성
 COPY prisma ./prisma/
-RUN npx prisma generate
+RUN DATABASE_URL="postgresql://x:x@x:5432/x" npx prisma generate \
+    && echo "=== Generated files ===" \
+    && ls -la generated/prisma/
 
 # 소스 복사 및 빌드
 COPY . .
