@@ -1,0 +1,9 @@
+-- CreateEnum
+CREATE TYPE "EventType" AS ENUM ('MEETING', 'DIGGING_CLUB', 'ONLINE', 'OTHER');
+
+-- AlterTable
+ALTER TABLE "Event" ADD COLUMN     "eventType" "EventType" NOT NULL DEFAULT 'MEETING',
+ADD COLUMN     "price" INTEGER NOT NULL DEFAULT 30000;
+
+-- AlterTable
+ALTER TABLE "User" ADD COLUMN     "isTerras" BOOLEAN NOT NULL DEFAULT false;

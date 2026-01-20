@@ -1,0 +1,9 @@
+-- AlterEnum
+ALTER TYPE "UserRole" ADD VALUE 'ADMIN';
+
+-- AlterTable
+ALTER TABLE "User" ADD COLUMN     "attendanceRate" DOUBLE PRECISION NOT NULL DEFAULT 0,
+ADD COLUMN     "eventsParticipated" INTEGER NOT NULL DEFAULT 0,
+ADD COLUMN     "totalBooksRead" INTEGER NOT NULL DEFAULT 0,
+ADD COLUMN     "voiceChannelDays" INTEGER NOT NULL DEFAULT 0,
+ADD COLUMN     "voiceChannelMinutes" INTEGER NOT NULL DEFAULT 0;

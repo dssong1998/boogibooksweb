@@ -1,0 +1,149 @@
+# ====================================
+# 부기북스 Docker Compose
+# ====================================
+# 사용법:
+#   docker compose up -d --build    # 빌드 및 시작
+#   docker compose logs -f          # 로그 확인
+#   docker compose down              # 중지
+
+version: '3.8'
+
+services:
+  # ==================
+  # PostgreSQL 데이터베이스
+  # ==================
+  postgres:
+    image: postgres:16-alpine
+    container_name: boogibooks-db
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-boogibooks}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?데이터베이스 비밀번호를 설정하세요}
+      POSTGRES_DB: ${POSTGRES_DB:-boogibooks}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    networks:
+      - boogibooks-net
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-boogibooks}"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  # ==================
+  # Backend API (NestJS)
+  # ==================
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: boogibooks-backend
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      NODE_ENV: production
+      PORT: 3000
+      DATABASE_URL: postgresql://${POSTGRES_USER:-boogibooks}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-boogibooks}
+      JWT_SECRET: ${JWT_SECRET:?JWT 시크릿을 설정하세요}
+      FRONTEND_URL: ${FRONTEND_URL:-https://boogibooks.com}
+      DISCORD_CLIENT_ID: ${DISCORD_CLIENT_ID}
+      DISCORD_CLIENT_SECRET: ${DISCORD_CLIENT_SECRET}
+      DISCORD_REDIRECT_URI: ${DISCORD_REDIRECT_URI}
+      DISCORD_BOT_TOKEN: ${DISCORD_BOT_TOKEN}
+      DISCORD_GUILD_ID: ${DISCORD_GUILD_ID}
+      DISCORD_TERRAS_ROLE_ID: ${DISCORD_TERRAS_ROLE_ID}
+      DISCORD_MEMBER_ROLE_ID: ${DISCORD_MEMBER_ROLE_ID}
+      DISCORD_LIBRARY_CHANNEL_ID: ${DISCORD_LIBRARY_CHANNEL_ID}
+      ADMIN_ID1: ${ADMIN_ID1}
+      ADMIN_ID2: ${ADMIN_ID2}
+      ADMIN_ID3: ${ADMIN_ID3}
+      NAVER_CLIENT_ID: ${NAVER_CLIENT_ID}
+      NAVER_CLIENT_SECRET: ${NAVER_CLIENT_SECRET}
+    networks:
+      - boogibooks-net
+    expose:
+      - "3000"
+
+  # ==================
+  # Frontend (React Router)
+  # ==================
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+      args:
+        - VITE_API_BASE_URL=${VITE_API_BASE_URL:-https://api.boogibooks.com}
+    container_name: boogibooks-frontend
+    restart: unless-stopped
+    depends_on:
+      - backend
+    environment:
+      NODE_ENV: production
+      PORT: 3000
+    networks:
+      - boogibooks-net
+    expose:
+      - "3000"
+
+  # ==================
+  # Discord Bot
+  # ==================
+  discord-bot:
+    build:
+      context: ./discord-bot
+      dockerfile: Dockerfile
+    container_name: boogibooks-discord-bot
+    restart: unless-stopped
+    depends_on:
+      - backend
+    environment:
+      NODE_ENV: production
+      DISCORD_BOT_TOKEN: ${DISCORD_BOT_TOKEN}
+      DISCORD_GUILD_ID: ${DISCORD_GUILD_ID}
+      BOOKS_CHANNEL_ID: ${BOOKS_CHANNEL_ID}
+      DIGGING_CHANNEL_ID: ${DIGGING_CHANNEL_ID}
+      TABLE_LOG_CHANNEL_ID: ${TABLE_LOG_CHANNEL_ID}
+      BACKEND_API_URL: http://backend:3000
+    networks:
+      - boogibooks-net
+
+  # ==================
+  # Nginx 리버스 프록시
+  # ==================
+  nginx:
+    image: nginx:alpine
+    container_name: boogibooks-nginx
+    restart: unless-stopped
+    depends_on:
+      - backend
+      - frontend
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./nginx/conf.d:/etc/nginx/conf.d:ro
+      - ./certbot/www:/var/www/certbot:ro
+      - ./certbot/conf:/etc/letsencrypt:ro
+    networks:
+      - boogibooks-net
+
+  # ==================
+  # Certbot (SSL 인증서 자동 갱신)
+  # ==================
+  certbot:
+    image: certbot/certbot
+    container_name: boogibooks-certbot
+    volumes:
+      - ./certbot/www:/var/www/certbot
+      - ./certbot/conf:/etc/letsencrypt
+    entrypoint: "/bin/sh -c 'trap exit TERM; while :; do certbot renew; sleep 12h & wait $${!}; done;'"
+
+networks:
+  boogibooks-net:
+    driver: bridge
+
+volumes:
+  postgres_data:

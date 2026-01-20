@@ -1,0 +1,185 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+// Looking for ways to speed up your queries, or scale easily with your serverless or edge functions?
+// Try Prisma Accelerate: https://pris.ly/cli/accelerate-init
+
+generator client {
+  provider = "prisma-client"
+  output  = "../generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+model Event {
+  id                 String    @id @default(uuid())
+  title              String
+  content            String?
+  date               DateTime
+  location           String
+  eventType          EventType @default(MEETING)
+  price              Int       @default(30000) // 기본 가격 3만원
+  maxParticipants    Int
+  requiredCoins      Int       @default(0)
+  applications       EventApplication[]
+  createdAt          DateTime  @default(now())
+  updatedAt          DateTime  @updatedAt
+}
+
+enum EventType {
+  MEETING      // 대면모임 (30,000원)
+  DIGGING_CLUB // 디깅클럽 (15,000원)
+  ONLINE       // 온라인 (무료 또는 별도)
+  OTHER        // 기타
+}
+
+model EventApplication {
+  id                  String                    @id @default(uuid())
+  eventId             String
+  event               Event                     @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  user                User                      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId              String
+  applicationOrder    Int                       // 신청 순번
+  status              EventApplicationStatus    @default(PENDING)
+  usedCoins           Int                       @default(0)
+  libraryMessageCount Int                       @default(0) // 서재 활동 수 (신청 시점)
+  paidAt              DateTime?                 // 결제 완료 시간
+  approvedAt          DateTime?                 // 관리자 승인 시간
+  createdAt           DateTime                  @default(now())
+  updatedAt           DateTime                  @updatedAt
+
+  @@unique([eventId, userId])
+}
+
+enum EventApplicationStatus {
+  PENDING         // 신청 대기 (관리자 승인 전)
+  APPROVED        // 관리자 승인됨 (결제 대기)
+  CONFIRMED       // 확정 (결제 완료 또는 테라스 멤버)
+  COIN_GUARANTEED // 코인 사용으로 정원 외 보장
+  CANCELLED       // 취소됨
+}
+
+model User {
+  id                    String    @id @default(uuid())
+  discordId             String    @unique
+  username              String
+  email                 String?
+  role                  UserRole  @default(VISITOR)
+  isTerras              Boolean   @default(false) // 테라스 멤버 여부
+  coins                 Int       @default(0)
+  books                 Book[]
+  comments              Comment[]
+  diggings              Digging[]
+  eventApplications     EventApplication[]
+  // 통계 필드
+  totalBooksRead        Int       @default(0)
+  voiceChannelMinutes   Int       @default(0)
+  voiceChannelDays      Int       @default(0)
+  attendanceRate        Float     @default(0)
+  eventsParticipated    Int       @default(0)
+  createdAt             DateTime  @default(now())
+  updatedAt             DateTime  @updatedAt
+}
+
+model Book {
+  id          String    @id @default(uuid())
+  userId      String
+  user        User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  title       String
+  author      String
+  isbn        String?
+  publisher   String?
+  coverUrl    String?
+  description String?
+  comments    Comment[]
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+}
+
+model Comment {
+  id        String      @id @default(uuid())
+  userId    String
+  user      User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  bookId    String
+  book      Book        @relation(fields: [bookId], references: [id], onDelete: Cascade)
+  type      CommentType @default(REVIEW)
+  content   String
+  page      Int?
+  createdAt DateTime    @default(now())
+  updatedAt DateTime    @updatedAt
+}
+
+enum CommentType {
+  PREVIEW // 프리뷰
+  REVIEW  // 리뷰
+  QUOTE   // 인용과 감상
+}
+
+model Digging {
+  id          String   @id @default(uuid())
+  userId      String
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  url         String
+  description String
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+// 식탁 방명록 (음성 채널 참여 기록)
+model TableLog {
+  id            String   @id @default(uuid())
+  discordUserId String   // Discord User ID (User와 별도 - 아직 가입 안 한 유저도 기록)
+  date          DateTime // 참여 날짜
+  channelName   String?  // 채널 이름 (식탁, 야식탁 등)
+  messageId     String?  @unique // Discord 메시지 ID (중복 방지)
+  createdAt     DateTime @default(now())
+
+  @@index([discordUserId])
+  @@index([date])
+}
+
+model MonthlyBook {
+  id             String   @id @default(uuid())
+  year           Int
+  month          Int
+  topic          String?  // 이달의 주제
+  title          String
+  author         String
+  isbn           String?
+  publisher      String?
+  coverUrl       String?
+  description    String?
+  recommendation String?
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  @@index([year, month]) // 같은 월에 여러 책 등록 가능
+}
+
+model Schedule {
+  id          String       @id @default(uuid())
+  title       String
+  description String?
+  date        DateTime
+  time        String?
+  type        ScheduleType @default(MEETING)
+  createdAt   DateTime     @default(now())
+  updatedAt   DateTime     @updatedAt
+}
+
+enum ScheduleType {
+  MEETING      // 모임
+  SHELLCAST    // 쉘캐스트
+  DIGGING_CLUB // 디깅클럽
+  MOVIE_NIGHT  // 무비나잇
+  BOOGITOUT    // 부깃아웃
+}
+
+enum UserRole {
+  VISITOR
+  MEMBER
+  ADMIN
+}
+// 테라스 멤버 여부는 User.isTerras 필드로 관리

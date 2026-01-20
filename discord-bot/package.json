@@ -1,0 +1,25 @@
+{
+  "name": "boogibooks-discord-bot",
+  "version": "1.0.0",
+  "description": "부기북스 Discord 봇 - 활동 추적 및 자동화",
+  "main": "dist/index.js",
+  "scripts": {
+    "dev": "ts-node src/index.ts",
+    "build": "tsc",
+    "start": "node dist/index.js",
+    "seed": "ts-node src/scripts/initialSeed.ts",
+    "embedRead": "ts-node src/scripts/embedRead.ts"
+  },
+  "keywords": ["discord", "bot", "boogibooks"],
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "@prisma/client": "^7.2.0",
+    "@types/node": "^25.0.9",
+    "axios": "^1.13.2",
+    "discord.js": "^14.25.1",
+    "dotenv": "^17.2.3",
+    "ts-node": "^10.9.2",
+    "typescript": "^5.9.3"
+  }
+}
