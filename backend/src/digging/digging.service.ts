@@ -17,7 +17,7 @@ export class DiggingService {
           connect:{
             id:userId,
       },
-    });
+    }}});
   }
 
   async findAll(userId: string) {
