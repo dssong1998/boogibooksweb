@@ -144,6 +144,34 @@ export default function Events() {
                           </svg>
                           <span>{event.location || "장소 미정"}</span>
                         </div>
+                        {event.date && (
+                          <div className="flex items-center space-x-2">
+                            <svg
+                              className="w-4 h-4"
+                              fill="none"
+                              stroke="currentColor"
+                              viewBox="0 0 24 24"
+                            >
+                              <path
+                                strokeLinecap="round"
+                                strokeLinejoin="round"
+                                strokeWidth={2}
+                                d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"
+                              />
+                            </svg>
+                            <span>
+                              {new Date(event.date).toLocaleString("ko-KR", {
+                                timeZone: "Asia/Seoul",
+                                year: "numeric",
+                                month: "short",
+                                day: "numeric",
+                                weekday: "short",
+                                hour: "2-digit",
+                                minute: "2-digit",
+                              })}
+                            </span>
+                          </div>
+                        )}
                         <div className="flex items-center space-x-2">
                           <svg
                             className="w-4 h-4"

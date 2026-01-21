@@ -191,10 +191,14 @@ export default function EventApply() {
               </svg>
               <span className="text-gray-700 dark:text-gray-300">
                 {event?.date
-                  ? new Date(event.date).toLocaleDateString("ko-KR", {
+                  ? new Date(event.date).toLocaleString("ko-KR", {
+                      timeZone: "Asia/Seoul",
                       year: "numeric",
                       month: "long",
                       day: "numeric",
+                      weekday: "short",
+                      hour: "2-digit",
+                      minute: "2-digit",
                     })
                   : "날짜 미정"}
               </span>

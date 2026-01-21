@@ -436,3 +436,28 @@ export function getTableLogMonthly(year?: number, month?: number) {
 export function getTableLogLeaderboard(limit: number = 10) {
   return fetchAPI<TableLogLeaderboard[]>(`/table-logs/leaderboard?limit=${limit}`);
 }
+
+// 날짜+시간 포맷 유틸리티 (한국 시간대)
+export function formatDateTime(date: string | Date, includeTime = true): string {
+  const d = typeof date === 'string' ? new Date(date) : date;
+  
+  const options: Intl.DateTimeFormatOptions = {
+    timeZone: 'Asia/Seoul',
+    year: 'numeric',
+    month: 'long',
+    day: 'numeric',
+    weekday: 'short',
+  };
+  
+  if (includeTime) {
+    options.hour = '2-digit';
+    options.minute = '2-digit';
+  }
+  
+  return d.toLocaleString('ko-KR', options);
+}
+
+// 날짜만 포맷 (시간 제외)
+export function formatDate(date: string | Date): string {
+  return formatDateTime(date, false);
+}
