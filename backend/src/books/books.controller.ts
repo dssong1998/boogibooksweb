@@ -12,6 +12,7 @@ import {
 import { BooksService } from './books.service';
 import { CreateBookDto } from './dto/create-book.dto';
 import { UpdateBookDto } from './dto/update-book.dto';
+import { CreateBookFromBotDto } from './dto/create-book-from-bot.dto';
 
 @Controller('books')
 export class BooksController {
@@ -29,6 +30,14 @@ export class BooksController {
   ) {
     // TODO: JWT에서 userId 추출하도록 변경
     return this.booksService.create(userId, createBookDto);
+  }
+
+  @Post('bot')
+  createFromBot(
+    @Body() createBookFromBotDto: CreateBookFromBotDto
+  ) {
+    // TODO: JWT에서 userId 추출하도록 변경
+    return this.booksService.createFromBot(createBookFromBotDto);
   }
 
   @Get()

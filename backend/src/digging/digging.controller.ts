@@ -11,6 +11,8 @@ import {
 import { DiggingService } from './digging.service';
 import { CreateDiggingDto } from './dto/create-digging.dto';
 import { UpdateDiggingDto } from './dto/update-digging.dto';
+import { CreateDiggingFromBotDto } from './dto/create-digging-from-bot.dto';
+
 
 @Controller('digging')
 export class DiggingController {
@@ -24,6 +26,14 @@ export class DiggingController {
     console.log('userId', userId);
     // TODO: JWT에서 userId 추출하도록 변경
     return this.diggingService.create(userId, createDiggingDto);
+  }
+
+  @Post('bot')
+  createFromBot(
+    @Body() createDiggingFromBotDto: CreateDiggingFromBotDto,
+  ) {
+    // TODO: JWT에서 userId 추출하도록 변경
+    return this.diggingService.createFromBot(createDiggingFromBotDto);
   }
 
   @Get()

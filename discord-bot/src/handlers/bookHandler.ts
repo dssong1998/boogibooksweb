@@ -29,7 +29,7 @@ export async function handleBookMessage(message: Message) {
         
         // 사용자 서재에 자동 추가
         await axios.post(
-          `${BACKEND_URL}/books`,
+          `${BACKEND_URL}/books/bot`,
           {
             title: book.title.replace(/<\/?b>/g, ''),
             author: book.author,
@@ -37,12 +37,8 @@ export async function handleBookMessage(message: Message) {
             publisher: book.publisher,
             coverUrl: book.image,
             description: book.description?.replace(/<\/?b>/g, ''),
+            discordId: message.author.id,
           },
-          {
-            headers: {
-              'user-id': message.author.id,
-            },
-          }
         );
 
         await message.react('✅');

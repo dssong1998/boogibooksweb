@@ -19,16 +19,13 @@ export async function handleDiggingMessage(message: Message) {
     try {
       // 백엔드 API로 디깅 추가
       await axios.post(
-        `${BACKEND_URL}/digging`,
+        `${BACKEND_URL}/digging/bot`,
         {
           url,
           description,
+          discordId: message.author.id,
+          
         },
-        {
-          headers: {
-            'user-id': message.author.id,
-          },
-        }
       );
 
       console.log(`🔗 디깅 추가: ${url} by ${message.author.username}`);
