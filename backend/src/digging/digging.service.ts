@@ -2,6 +2,7 @@ import { Injectable } from '@nestjs/common';
 import { CreateDiggingDto } from './dto/create-digging.dto';
 import { UpdateDiggingDto } from './dto/update-digging.dto';
 import { PrismaService } from '../prisma/prisma.service';
+import { User } from 'src/users/entities/user.entity';
 
 @Injectable()
 export class DiggingService {
@@ -12,7 +13,9 @@ export class DiggingService {
     return await (this.prisma as any).digging.create({
       data: {
         ...createDiggingDto,
-        userId,
+        user:{
+          connect:{
+            id:userId,
       },
     });
   }
