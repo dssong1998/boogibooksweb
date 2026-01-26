@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router";
 import type { Route } from "./+types/payment";
-import { confirmEventPayment, getEvent, getUserById, type EventData } from "../lib/api";
+import { confirmEventPayment, getEvent, getUserById, getMe, type EventData } from "../lib/api";
 
 export function meta({}: Route.MetaArgs) {
   return [
@@ -35,29 +35,24 @@ export default function Payment() {
 
   useEffect(() => {
     const loadData = async () => {
-      // userId가 URL에 있으면 사용, 없으면 localStorage에서 가져오기
-      let resolvedUserId = userId;
-      
-      if (!resolvedUserId) {
-        const userStr = localStorage.getItem("user");
-        if (userStr) {
-          try {
-            const parsed = JSON.parse(userStr) as { id?: string };
-            resolvedUserId = parsed.id ?? null;
-          } catch {
-            // ignore
-          }
-        }
-      }
-      
-      // userId가 있으면 API로 사용자 정보 가져오기
-      if (resolvedUserId) {
+      // userId가 URL에 있으면 getUserById 사용, 없으면 getMe() 사용
+      if (userId) {
         try {
-          const userData = await getUserById(resolvedUserId);
+          const userData = await getUserById(userId);
           setUserName(userData.username);
           setCurrentUserId(userData.id);
         } catch (error) {
-          console.error("Failed to load user:", error);
+          console.error("Failed to load user by id:", error);
+        }
+      } else {
+        try {
+          const userData = await getMe();
+          if (userData) {
+            setUserName(userData.username);
+            setCurrentUserId(userData.id);
+          }
+        } catch (error) {
+          console.error("Failed to load current user:", error);
         }
       }
 

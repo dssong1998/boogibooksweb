@@ -7,14 +7,25 @@ import {
   Param,
   Delete,
   Headers,
+  UnauthorizedException,
 } from '@nestjs/common';
 import { EventsService } from './events.service';
 import { CreateEventDto } from './dto/create-event.dto';
 import { UpdateEventDto } from './dto/update-event.dto';
+import { AuthService } from '../auth/auth.service';
 
 @Controller('events')
 export class EventsController {
-  constructor(private readonly eventsService: EventsService) {}
+  constructor(
+    private readonly eventsService: EventsService,
+    private readonly authService: AuthService,
+  ) {}
+
+  private getUserId(authHeader: string | undefined): string {
+    const userId = this.authService.extractUserIdFromToken(authHeader);
+    if (!userId) throw new UnauthorizedException('Invalid or missing token');
+    return userId;
+  }
 
   @Post()
   create(@Body() createEventDto: CreateEventDto) {
@@ -45,8 +56,9 @@ export class EventsController {
   @Get(':id/eligibility')
   checkEligibility(
     @Param('id') eventId: string,
-    @Headers('x-user-id') userId: string,
+    @Headers('Authorization') authHeader: string,
   ) {
+    const userId = this.getUserId(authHeader);
     return this.eventsService.checkApplicationEligibility(userId, eventId);
   }
 
@@ -54,20 +66,22 @@ export class EventsController {
   @Post(':id/apply')
   apply(
     @Param('id') eventId: string,
-    @Headers('x-user-id') userId: string,
+    @Headers('Authorization') authHeader: string,
     @Body() body: { useCoins?: boolean },
   ) {
+    const userId = this.getUserId(authHeader);
     return this.eventsService.applyToEvent(userId, eventId, body.useCoins);
   }
 
-  // 결제 완료 처리 (토큰 없이 userId를 body로 받을 수 있음)
+  // 결제 완료 처리 (토큰 또는 body의 userId 사용)
   @Post(':id/confirm-payment')
   confirmPayment(
     @Param('id') eventId: string,
-    @Headers('x-user-id') headerUserId: string,
+    @Headers('Authorization') authHeader: string,
     @Body('userId') bodyUserId?: string,
   ) {
-    const userId = bodyUserId || headerUserId;
+    // body에 userId가 있으면 사용 (결제 페이지에서 직접 호출 시)
+    const userId = bodyUserId || this.getUserId(authHeader);
     return this.eventsService.confirmPayment(userId, eventId);
   }
 
@@ -75,8 +89,9 @@ export class EventsController {
   @Delete(':id/cancel')
   cancelApplication(
     @Param('id') eventId: string,
-    @Headers('x-user-id') userId: string,
+    @Headers('Authorization') authHeader: string,
   ) {
+    const userId = this.getUserId(authHeader);
     return this.eventsService.cancelApplication(userId, eventId);
   }
 

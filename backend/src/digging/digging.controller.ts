@@ -7,38 +7,44 @@ import {
   Param,
   Delete,
   Headers,
+  UnauthorizedException,
 } from '@nestjs/common';
 import { DiggingService } from './digging.service';
 import { CreateDiggingDto } from './dto/create-digging.dto';
 import { UpdateDiggingDto } from './dto/update-digging.dto';
 import { CreateDiggingFromBotDto } from './dto/create-digging-from-bot.dto';
-
+import { AuthService } from '../auth/auth.service';
 
 @Controller('digging')
 export class DiggingController {
-  constructor(private readonly diggingService: DiggingService) {}
+  constructor(
+    private readonly diggingService: DiggingService,
+    private readonly authService: AuthService,
+  ) {}
+
+  private getUserId(authHeader: string | undefined): string {
+    const userId = this.authService.extractUserIdFromToken(authHeader);
+    if (!userId) throw new UnauthorizedException('Invalid or missing token');
+    return userId;
+  }
 
   @Post()
   create(
-    @Headers('x-user-id') userId: string,
+    @Headers('Authorization') authHeader: string,
     @Body() createDiggingDto: CreateDiggingDto,
   ) {
-    console.log('userId', userId);
-    // TODO: JWT에서 userId 추출하도록 변경
+    const userId = this.getUserId(authHeader);
     return this.diggingService.create(userId, createDiggingDto);
   }
 
   @Post('bot')
-  createFromBot(
-    @Body() createDiggingFromBotDto: CreateDiggingFromBotDto,
-  ) {
-    // TODO: JWT에서 userId 추출하도록 변경
+  createFromBot(@Body() createDiggingFromBotDto: CreateDiggingFromBotDto) {
     return this.diggingService.createFromBot(createDiggingFromBotDto);
   }
 
   @Get()
-  findAll(@Headers('x-user-id') userId: string) {
-    // TODO: JWT에서 userId 추출하도록 변경
+  findAll(@Headers('Authorization') authHeader: string) {
+    const userId = this.getUserId(authHeader);
     return this.diggingService.findAll(userId);
   }
 

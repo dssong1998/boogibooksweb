@@ -10,10 +10,12 @@ import {
   deleteAdminSchedule,
   getEventApplications,
   approveEventApplications,
+  getMe,
   type EventData,
   type MonthlyBookData,
   type ScheduleData,
   type EventApplicationData,
+  type UserData,
 } from "../lib/api";
 
 export function meta({}: Route.MetaArgs) {
@@ -25,7 +27,7 @@ export function meta({}: Route.MetaArgs) {
 
 export default function Admin() {
   const navigate = useNavigate();
-  const [user, setUser] = useState<any>(null);
+  const [user, setUser] = useState<UserData | null>(null);
   const [activeTab, setActiveTab] = useState<"events" | "books" | "calendar">(
     "events"
   );
@@ -47,23 +49,25 @@ export default function Admin() {
 
   useEffect(() => {
     const token = localStorage.getItem("auth_token");
-    const userStr = localStorage.getItem("user");
-
-    if (!token || !userStr) {
+    if (!token) {
       navigate("/");
       return;
     }
 
-    try {
-      const userData = JSON.parse(userStr);
-      if (userData.role !== "ADMIN") {
-        navigate("/dashboard");
-        return;
+    const loadUser = async () => {
+      try {
+        const userData = await getMe();
+        if (!userData || userData.role !== "ADMIN") {
+          navigate("/dashboard");
+          return;
+        }
+        setUser(userData);
+      } catch {
+        navigate("/");
       }
-      setUser(userData);
-    } catch {
-      navigate("/");
-    }
+    };
+
+    loadUser();
   }, [navigate]);
 
   useEffect(() => {

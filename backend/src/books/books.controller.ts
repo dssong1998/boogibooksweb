@@ -8,15 +8,26 @@ import {
   Delete,
   Query,
   Headers,
+  UnauthorizedException,
 } from '@nestjs/common';
 import { BooksService } from './books.service';
 import { CreateBookDto } from './dto/create-book.dto';
 import { UpdateBookDto } from './dto/update-book.dto';
 import { CreateBookFromBotDto } from './dto/create-book-from-bot.dto';
+import { AuthService } from '../auth/auth.service';
 
 @Controller('books')
 export class BooksController {
-  constructor(private readonly booksService: BooksService) {}
+  constructor(
+    private readonly booksService: BooksService,
+    private readonly authService: AuthService,
+  ) {}
+
+  private getUserId(authHeader: string | undefined): string {
+    const userId = this.authService.extractUserIdFromToken(authHeader);
+    if (!userId) throw new UnauthorizedException('Invalid or missing token');
+    return userId;
+  }
 
   @Get('search')
   searchNaver(@Query('query') query: string, @Query('display') display = 10) {
@@ -25,24 +36,21 @@ export class BooksController {
 
   @Post()
   create(
-    @Headers('x-user-id') userId: string,
+    @Headers('Authorization') authHeader: string,
     @Body() createBookDto: CreateBookDto,
   ) {
-    // TODO: JWT에서 userId 추출하도록 변경
+    const userId = this.getUserId(authHeader);
     return this.booksService.create(userId, createBookDto);
   }
 
   @Post('bot')
-  createFromBot(
-    @Body() createBookFromBotDto: CreateBookFromBotDto
-  ) {
-    // TODO: JWT에서 userId 추출하도록 변경
+  createFromBot(@Body() createBookFromBotDto: CreateBookFromBotDto) {
     return this.booksService.createFromBot(createBookFromBotDto);
   }
 
   @Get()
-  findAll(@Headers('x-user-id') userId: string) {
-    // TODO: JWT에서 userId 추출하도록 변경
+  findAll(@Headers('Authorization') authHeader: string) {
+    const userId = this.getUserId(authHeader);
     return this.booksService.findAll(userId);
   }
 

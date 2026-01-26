@@ -1,5 +1,14 @@
-import { Controller, Get, Post, Query, Headers, Body } from '@nestjs/common';
+import {
+  Controller,
+  Get,
+  Post,
+  Query,
+  Headers,
+  Body,
+  UnauthorizedException,
+} from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
+import { AuthService } from '../auth/auth.service';
 
 interface CreateTableLogDto {
   discordUserId: string;
@@ -11,7 +20,16 @@ interface CreateTableLogDto {
 
 @Controller('table-logs')
 export class TableLogsController {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly authService: AuthService,
+  ) {}
+
+  private getUserId(authHeader: string | undefined): string {
+    const userId = this.authService.extractUserIdFromToken(authHeader);
+    if (!userId) throw new UnauthorizedException('Invalid or missing token');
+    return userId;
+  }
 
   /**
    * 실시간 음성 활동 기록 (Discord Bot에서 호출)
@@ -49,7 +67,8 @@ export class TableLogsController {
 
   // 유저의 식탁 참여 통계
   @Get('stats')
-  async getUserStats(@Headers('x-user-id') userId: string) {
+  async getUserStats(@Headers('Authorization') authHeader: string) {
+    const userId = this.getUserId(authHeader);
     // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access
     const user = await (this.prisma as any).user.findUnique({
       where: { id: userId },

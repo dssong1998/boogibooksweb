@@ -1,6 +1,7 @@
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { useSearchParams, useNavigate } from "react-router";
 import type { Route } from "./+types/auth.callback";
+import { getMe, type UserData } from "~/lib/api";
 
 export function meta({}: Route.MetaArgs) {
   return [
@@ -13,28 +14,38 @@ export default function AuthCallback() {
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
   const token = searchParams.get("token");
-  const userStr = searchParams.get("user");
   const error = searchParams.get("error");
-
+  const [user, setUser] = useState<UserData | null>(null);
   useEffect(() => {
-    if (token && userStr) {
-      try {
-        // 토큰과 사용자 정보를 localStorage에 저장
-        localStorage.setItem("auth_token", token);
-        localStorage.setItem("user", userStr);
-        
-        // 대시보드로 이동
-        const timer = setTimeout(() => {
-          navigate("/dashboard");
-        }, 1500);
-        return () => clearTimeout(timer);
-      } catch (err) {
-        console.error("Failed to save auth data:", err);
-      }
-    }
-  }, [token, userStr, navigate]);
+    if (!token) return;
 
-  const user = userStr ? JSON.parse(userStr) : null;
+    // 토큰 저장
+    localStorage.setItem("auth_token", token);
+
+    // 유저 정보 로드 및 localStorage에 저장 (x-user-id 헤더용)
+    const loadUserAndRedirect = async () => {
+      try {
+        const userData = await getMe();
+        setUser(userData);
+        // API 호출 시 x-user-id 헤더를 위해 localStorage에 저장
+        if (userData) {
+          localStorage.setItem("user", JSON.stringify(userData));
+        }
+      } catch (err) {
+        console.error("Failed to load user:", err);
+      }
+    };
+
+    loadUserAndRedirect();
+
+    // 대시보드로 이동
+    const timer = setTimeout(() => {
+      navigate("/dashboard");
+    }, 1500);
+
+    return () => clearTimeout(timer);
+  }, [token, navigate]);
+
 
   if (error) {
     return (

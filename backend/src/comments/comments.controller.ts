@@ -7,21 +7,32 @@ import {
   Param,
   Delete,
   Headers,
+  UnauthorizedException,
 } from '@nestjs/common';
 import { CommentsService } from './comments.service';
 import { CreateCommentDto } from './dto/create-comment.dto';
 import { UpdateCommentDto } from './dto/update-comment.dto';
+import { AuthService } from '../auth/auth.service';
 
 @Controller('comments')
 export class CommentsController {
-  constructor(private readonly commentsService: CommentsService) {}
+  constructor(
+    private readonly commentsService: CommentsService,
+    private readonly authService: AuthService,
+  ) {}
+
+  private getUserId(authHeader: string | undefined): string {
+    const userId = this.authService.extractUserIdFromToken(authHeader);
+    if (!userId) throw new UnauthorizedException('Invalid or missing token');
+    return userId;
+  }
 
   @Post()
   create(
-    @Headers('x-user-id') userId: string,
+    @Headers('Authorization') authHeader: string,
     @Body() createCommentDto: CreateCommentDto,
   ) {
-    // TODO: JWT에서 userId 추출하도록 변경
+    const userId = this.getUserId(authHeader);
     return this.commentsService.create(userId, createCommentDto);
   }
 

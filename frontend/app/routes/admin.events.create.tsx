@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router";
 import type { Route } from "./+types/admin.events.create";
-import { createAdminEvent } from "../lib/api";
+import { createAdminEvent, getMe } from "../lib/api";
 
 export function meta({}: Route.MetaArgs) {
   return [
@@ -24,21 +24,23 @@ export default function AdminEventsCreate() {
 
   useEffect(() => {
     const token = localStorage.getItem("auth_token");
-    const userStr = localStorage.getItem("user");
-
-    if (!token || !userStr) {
+    if (!token) {
       navigate("/");
       return;
     }
 
-    try {
-      const userData = JSON.parse(userStr);
-      if (userData.role !== "ADMIN") {
-        navigate("/dashboard");
+    const checkAdmin = async () => {
+      try {
+        const userData = await getMe();
+        if (!userData || userData.role !== "ADMIN") {
+          navigate("/dashboard");
+        }
+      } catch {
+        navigate("/");
       }
-    } catch {
-      navigate("/");
-    }
+    };
+
+    checkAdmin();
   }, [navigate]);
 
   const handleSubmit = async (e: React.FormEvent) => {

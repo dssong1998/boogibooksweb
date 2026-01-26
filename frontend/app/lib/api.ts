@@ -3,24 +3,19 @@ const API_BASE_URL =
 
 type HttpMethod = "GET" | "POST" | "PATCH" | "DELETE";
 
-function getAuthHeaders() {
+function getAuthHeaders(): Record<string, string> {
   const token = localStorage.getItem("auth_token");
-  const userStr = localStorage.getItem("user");
-  let userId: string | undefined;
+  return token ? { Authorization: `Bearer ${token}` } : {};
+}
 
-  if (userStr) {
-    try {
-      const parsed = JSON.parse(userStr) as { id?: string };
-      userId = parsed.id;
-    } catch {
-      userId = undefined;
-    }
+// 토큰 만료 시 로그아웃 처리
+function handleTokenExpired() {
+  localStorage.removeItem("auth_token");
+  localStorage.removeItem("user");
+  // 현재 페이지가 로그인 페이지가 아니면 리다이렉트
+  if (typeof window !== "undefined" && !window.location.pathname.startsWith("/auth")) {
+    window.location.href = "/";
   }
-
-  return {
-    ...(token ? { Authorization: `Bearer ${token}` } : {}),
-    ...(userId ? { "x-user-id": userId } : {}),
-  };
 }
 
 async function fetchAPI<T>(
@@ -41,6 +36,12 @@ async function fetchAPI<T>(
     ...(body ? { body: JSON.stringify(body) } : {}),
   });
 
+  // 401 Unauthorized = 토큰 만료 또는 무효
+  if (response.status === 401) {
+    handleTokenExpired();
+    throw new Error("Token expired");
+  }
+
   if (!response.ok) {
     throw new Error(`API Error: ${response.status} ${response.statusText}`);
   }
@@ -49,10 +50,28 @@ async function fetchAPI<T>(
     return undefined as T;
   }
 
-  return response.json() as Promise<T>;
+  // 빈 응답 처리
+  const text = await response.text();
+  if (!text || text.trim() === "") {
+    return undefined as T;
+  }
+
+  return JSON.parse(text) as T;
 }
 
 export type EventType = "MEETING" | "DIGGING_CLUB" | "ONLINE" | "OTHER";
+
+export interface UserData {
+  id: string;
+  username: string;
+  email: string | null;
+  role: string;
+  coins?: number;
+  totalBooksRead?: number;
+  eventsParticipated?: number;
+  diggingsCount?: number;
+  isTerras?: boolean;
+}
 
 export interface EventData {
   id: string;
@@ -103,6 +122,10 @@ export interface NaverBookItem {
   publisher: string;
   image: string;
   description?: string;
+}
+
+export function getMe() {
+  return fetchAPI<UserData>("/auth/me");
 }
 
 export function getEvents() {

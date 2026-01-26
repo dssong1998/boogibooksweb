@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router";
 import type { Route } from "./+types/admin.monthly-book.create";
-import { createAdminMonthlyBook, searchBooks } from "../lib/api";
+import { createAdminMonthlyBook, searchBooks, getMe } from "../lib/api";
 
 export function meta({}: Route.MetaArgs) {
   return [
@@ -33,21 +33,23 @@ export default function AdminMonthlyBookCreate() {
 
   useEffect(() => {
     const token = localStorage.getItem("auth_token");
-    const userStr = localStorage.getItem("user");
-
-    if (!token || !userStr) {
+    if (!token) {
       navigate("/");
       return;
     }
 
-    try {
-      const userData = JSON.parse(userStr);
-      if (userData.role !== "ADMIN") {
-        navigate("/dashboard");
+    const checkAdmin = async () => {
+      try {
+        const userData = await getMe();
+        if (!userData || userData.role !== "ADMIN") {
+          navigate("/dashboard");
+        }
+      } catch {
+        navigate("/");
       }
-    } catch {
-      navigate("/");
-    }
+    };
+
+    checkAdmin();
   }, [navigate]);
 
   const handleSearch = async () => {

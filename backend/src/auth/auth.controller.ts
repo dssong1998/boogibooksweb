@@ -1,4 +1,4 @@
-import { Controller, Get, Query, Res } from '@nestjs/common';
+import { Controller, Get, Query, Res, Headers } from '@nestjs/common';
 import type { Response } from 'express';
 import { AuthService } from './auth.service';
 
@@ -72,12 +72,18 @@ export class AuthController {
 
       const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:8080';
       return res.redirect(
-        `${frontendUrl}/auth/callback?token=${authTokenData.access_token}&user=${encodeURIComponent(JSON.stringify(authTokenData.user))}`,
+        `${frontendUrl}/auth/callback?token=${authTokenData.access_token}`,
       );
     } catch (error) {
       console.error('Discord OAuth error:', error);
       const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:8080';
       return res.redirect(`${frontendUrl}/auth/callback?error=auth_failed`);
     }
+  }
+  @Get('me')
+  me(@Headers('Authorization') token: string) {
+    const me = this.authService.me(token);
+    console.log('me:', me);
+    return me;
   }
 }

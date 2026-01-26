@@ -9,6 +9,8 @@ import {
   getWeekSchedules,
   getCurrentMonthlyBooks,
   getMyTableLogStats,
+  getMe,
+  type UserData,
   type BookData,
   type DiggingData,
   type EventData,
@@ -24,17 +26,7 @@ export function meta({}: Route.MetaArgs) {
   ];
 }
 
-interface User {
-  id: string;
-  username: string;
-  email: string | null;
-  role: string;
-  coins?: number;
-  totalBooksRead?: number;
-  eventsParticipated?: number;
-  diggingsCount?: number;
-  isTerras?: boolean;
-}
+
 
 interface WeeklyScheduleItem {
   id: string;
@@ -55,7 +47,7 @@ const scheduleTypeLabels: Record<string, { label: string; color: string }> = {
 
 export default function Dashboard() {
   const navigate = useNavigate();
-  const [user, setUser] = useState<User | null>(null);
+  const [user, setUser] = useState<UserData | null>(null);
   const [showDiggingModal, setShowDiggingModal] = useState(false);
   const [diggingUrl, setDiggingUrl] = useState("");
   const [diggingDescription, setDiggingDescription] = useState("");
@@ -69,41 +61,49 @@ export default function Dashboard() {
 
   useEffect(() => {
     const token = localStorage.getItem("auth_token");
-    const userStr = localStorage.getItem("user");
 
-    if (!token || !userStr) {
+    if (!token) {
       navigate("/");
       return;
     }
 
-    try {
-      setUser(JSON.parse(userStr));
-    } catch {
-      navigate("/");
-    }
   }, [navigate]);
 
   useEffect(() => {
+    const token = localStorage.getItem("auth_token");
+    if (!token) {
+      setIsLoading(false);
+      return;
+    }
+
     const loadDashboard = async () => {
+      console.log("Dashboard loading started...");
       try {
-        const [booksData, eventsData, diggingsData, schedulesData, monthlyBooksData, tableLogData] = await Promise.all([
-          getBooks(),
-          getEvents(),
-          getDiggings(),
-          getWeekSchedules(),
-          getCurrentMonthlyBooks().catch(() => []),
-          getMyTableLogStats().catch(() => null),
+        const results = await Promise.all([
+          getBooks().catch((e) => { console.error("getBooks failed:", e); return []; }),
+          getEvents().catch((e) => { console.error("getEvents failed:", e); return []; }),
+          getDiggings().catch((e) => { console.error("getDiggings failed:", e); return []; }),
+          getWeekSchedules().catch((e) => { console.error("getWeekSchedules failed:", e); return []; }),
+          getCurrentMonthlyBooks().catch((e) => { console.error("getCurrentMonthlyBooks failed:", e); return []; }),
+          getMyTableLogStats().catch((e) => { console.error("getMyTableLogStats failed:", e); return null; }),
+          getMe().catch((e) => { console.error("getMe failed:", e); return null; }),
         ]);
+        console.log("Dashboard API results:", results);
+        
+        const [booksData, eventsData, diggingsData, schedulesData, monthlyBooksData, tableLogData, userData] = results;
         setBooks(Array.isArray(booksData) ? booksData : []);
         setEvents(Array.isArray(eventsData) ? eventsData : []);
         setDiggings(Array.isArray(diggingsData) ? diggingsData : []);
         setSchedules(Array.isArray(schedulesData) ? schedulesData : []);
         setMonthlyBooks(Array.isArray(monthlyBooksData) ? monthlyBooksData : []);
         setTableLogStats(tableLogData);
+        setUser(userData);
+        console.log("Dashboard data set successfully");
       } catch (error) {
         console.error("Dashboard load failed:", error);
       } finally {
         setIsLoading(false);
+        console.log("Dashboard loading finished");
       }
     };
 

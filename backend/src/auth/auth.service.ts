@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, UnauthorizedException } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import { PrismaService } from '../prisma/prisma.service';
 import { UserRole } from '../users/entities/user.entity';
@@ -9,6 +9,28 @@ export class AuthService {
     private readonly prisma: PrismaService,
     private readonly jwtService: JwtService,
   ) {}
+
+  /**
+   * Authorization 헤더에서 userId 추출
+   * @param authHeader "Bearer <token>" 형식
+   * @returns userId or null
+   */
+  extractUserIdFromToken(authHeader: string | undefined): string | null {
+    if (!authHeader) return null;
+
+    const token = authHeader.startsWith('Bearer ')
+      ? authHeader.slice(7)
+      : authHeader;
+
+    try {
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
+      const payload = this.jwtService.verify(token);
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
+      return (payload.sub as string) || null;
+    } catch {
+      return null;
+    }
+  }
 
   getDiscordAuthUrl(): string {
     const clientId = process.env.DISCORD_CLIENT_ID;
@@ -223,5 +245,41 @@ export class AuthService {
         coins: user.coins || 0,
       },
     };
+  }
+  async me(token: string) {
+    if (!token) {
+      throw new UnauthorizedException('No token provided');
+    }
+
+    // "Bearer " 접두사 제거
+    const actualToken = token.startsWith('Bearer ') ? token.slice(7) : token;
+
+    let userId: string;
+
+    try {
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
+      const payload = this.jwtService.verify(actualToken);
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
+      if (!payload.sub) {
+        throw new UnauthorizedException('Invalid token');
+      }
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-member-access
+      userId = payload.sub;
+    } catch {
+      // 토큰 만료 또는 검증 실패 시 401 반환
+      throw new UnauthorizedException('Token expired or invalid');
+    }
+
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-assignment
+    const user = await (this.prisma as any).user.findUnique({
+      where: { id: userId },
+    });
+
+    if (!user) {
+      throw new UnauthorizedException('User not found');
+    }
+
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-return
+    return user;
   }
 }
