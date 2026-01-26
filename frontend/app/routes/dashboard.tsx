@@ -88,7 +88,6 @@ export default function Dashboard() {
           getMyTableLogStats().catch((e) => { console.error("getMyTableLogStats failed:", e); return null; }),
           getMe().catch((e) => { console.error("getMe failed:", e); return null; }),
         ]);
-        console.log("Dashboard API results:", results);
         
         const [booksData, eventsData, diggingsData, schedulesData, monthlyBooksData, tableLogData, userData] = results;
         setBooks(Array.isArray(booksData) ? booksData : []);
