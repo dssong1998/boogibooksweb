@@ -11,7 +11,6 @@ function getAuthHeaders(): Record<string, string> {
 // 토큰 만료 시 로그아웃 처리
 function handleTokenExpired() {
   localStorage.removeItem("auth_token");
-  localStorage.removeItem("user");
   // 현재 페이지가 로그인 페이지가 아니면 리다이렉트
   if (typeof window !== "undefined" && !window.location.pathname.startsWith("/auth")) {
     window.location.href = "/";

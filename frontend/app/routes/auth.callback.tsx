@@ -22,21 +22,17 @@ export default function AuthCallback() {
     // 토큰 저장
     localStorage.setItem("auth_token", token);
 
-    // 유저 정보 로드 및 localStorage에 저장 (x-user-id 헤더용)
-    const loadUserAndRedirect = async () => {
+    // 유저 정보 로드
+    const loadUser = async () => {
       try {
         const userData = await getMe();
         setUser(userData);
-        // API 호출 시 x-user-id 헤더를 위해 localStorage에 저장
-        if (userData) {
-          localStorage.setItem("user", JSON.stringify(userData));
-        }
       } catch (err) {
         console.error("Failed to load user:", err);
       }
     };
 
-    loadUserAndRedirect();
+    loadUser();
 
     // 대시보드로 이동
     const timer = setTimeout(() => {

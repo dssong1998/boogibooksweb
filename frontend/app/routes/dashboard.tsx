@@ -111,7 +111,6 @@ export default function Dashboard() {
 
   const handleLogout = () => {
     localStorage.removeItem("auth_token");
-    localStorage.removeItem("user");
     navigate("/");
   };
 
