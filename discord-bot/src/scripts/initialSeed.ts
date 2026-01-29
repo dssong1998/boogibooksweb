@@ -258,13 +258,58 @@ async function seedCommentsFromThread(
   }
 }
 
+// 해시태그 추출
+function extractHashtags(text: string): string[] {
+  const hashtagRegex = /#([^\s#]+)/g;
+  const matches = text.match(hashtagRegex);
+  return matches ? matches.map((tag) => tag.slice(1)) : [];
+}
+
+// URL에서 메타 타이틀 추출
+async function fetchMetaTitle(url: string): Promise<string | null> {
+  try {
+    const response = await axios.get(url, {
+      timeout: 5000,
+      headers: {
+        'User-Agent': 'Mozilla/5.0 (compatible; BoogibooksBot/1.0)',
+        Accept: 'text/html',
+      },
+      maxRedirects: 3,
+    });
+
+    const html = response.data as string;
+
+    // og:title 먼저 확인
+    const ogTitleMatch = html.match(
+      /<meta[^>]*property=["']og:title["'][^>]*content=["']([^"']+)["']/i
+    );
+    if (ogTitleMatch) return ogTitleMatch[1].trim();
+
+    // twitter:title 확인
+    const twitterTitleMatch = html.match(
+      /<meta[^>]*name=["']twitter:title["'][^>]*content=["']([^"']+)["']/i
+    );
+    if (twitterTitleMatch) return twitterTitleMatch[1].trim();
+
+    // <title> 태그 확인
+    const titleMatch = html.match(/<title[^>]*>([^<]+)<\/title>/i);
+    if (titleMatch) return titleMatch[1].trim();
+
+    return null;
+  } catch {
+    return null;
+  }
+}
+
 /**
  * 4. 디깅박스 채널에서 디깅 생성
  * 
  * 텍스트 채널의 메시지에서:
  * - URL 추출 → 디깅 URL
+ * - URL의 메타 타이틀 → 디깅 title
  * - 메시지 작성자 → 디깅 추가자
- * - URL 제외한 나머지 텍스트 → 코멘트(description)
+ * - URL/해시태그 제외한 나머지 텍스트 → description
+ * - 해시태그 추출 → hashtags
  */
 async function seedDiggings(channel: TextChannel) {
   console.log('\n🔗 [4/5] 디깅박스 시드 시작...');
@@ -282,8 +327,14 @@ async function seedDiggings(channel: TextChannel) {
     const urls = message.content.match(urlRegex);
     if (!urls || urls.length === 0) continue;
 
-    // URL을 제외한 나머지가 코멘트
-    const comment = message.content.replace(urlRegex, '').trim();
+    // 해시태그 추출
+    const hashtags = extractHashtags(message.content);
+
+    // URL과 해시태그를 제외한 나머지가 description
+    const description = message.content
+      .replace(urlRegex, '')
+      .replace(/#[^\s#]+/g, '')
+      .trim();
     const username = message.member?.nickname || message.author.username;
 
     // 각 URL에 대해 디깅 생성
@@ -291,16 +342,22 @@ async function seedDiggings(channel: TextChannel) {
       stats.diggings.total++;
       
       try {
+        // 메타 타이틀 추출
+        const title = await fetchMetaTitle(url.trim());
+
         await axios.post(`${BACKEND_URL}/digging/seed`, {
           discordUserId: message.author.id,
           url: url.trim(),
-          description: comment || '디스코드에서 공유됨',
+          title: title || undefined,
+          description: description || '디스코드에서 공유됨',
+          hashtags,
           createdAt: message.createdAt.toISOString(),
         });
         stats.diggings.created++;
-        console.log(`  ✅ ${username}: ${url.substring(0, 50)}...`);
-      } catch (error: any) {
-        if (error.response?.status === 409) {
+        console.log(`  ✅ ${username}: ${title ? `"${title.substring(0, 30)}..."` : url.substring(0, 50)}...`);
+      } catch (error: unknown) {
+        const axiosError = error as { response?: { status?: number } };
+        if (axiosError.response?.status === 409) {
           console.log(`  ⏭️ ${username}: 이미 존재`);
         } else {
           stats.diggings.failed++;

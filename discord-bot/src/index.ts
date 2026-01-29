@@ -56,10 +56,8 @@ client.on(Events.MessageCreate, async (message: Message) => {
     await handleBookMessage(message);
   }
 
-  // 디깅 채널에서 링크 감지
-  if (message.channel.id === process.env.DIGGING_CHANNEL_ID || 
-      channelName === '디깅박스' || 
-      channelName === 'digging') {
+  // 디깅박스 채널에서만 링크 감지 (채널 ID로만 체크)
+  if (message.channel.id === process.env.DIGGING_CHANNEL_ID) {
     await handleDiggingMessage(message);
   }
 

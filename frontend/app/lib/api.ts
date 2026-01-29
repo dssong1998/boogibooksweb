@@ -459,6 +459,61 @@ export function getTableLogLeaderboard(limit: number = 10) {
   return fetchAPI<TableLogLeaderboard[]>(`/table-logs/leaderboard?limit=${limit}`);
 }
 
+// 월간 식탁 리더보드 (이용시간 + 방문횟수)
+export interface MonthlyLeaderboardEntry {
+  discordId: string;
+  userId?: string;
+  username: string;
+  totalMinutes: number;
+  visitCount: number;
+  uniqueDays: number;
+}
+
+export interface MonthlyLeaderboard {
+  year: number;
+  month: number;
+  timeLeaderboard: MonthlyLeaderboardEntry[];
+  visitLeaderboard: MonthlyLeaderboardEntry[];
+}
+
+export function getMonthlyLeaderboard(year?: number, month?: number) {
+  const params = new URLSearchParams();
+  if (year) params.append("year", String(year));
+  if (month) params.append("month", String(month));
+  const query = params.toString() ? `?${params.toString()}` : "";
+  return fetchAPI<MonthlyLeaderboard>(`/table-logs/monthly-leaderboard${query}`);
+}
+
+// 디깅 공개 목록 (페이지네이션)
+export interface DiggingPublic {
+  id: string;
+  url: string;
+  title?: string;
+  description: string;
+  hashtags: string[];
+  createdAt: string;
+  user: { id: string; username: string };
+}
+
+export interface DiggingPublicResponse {
+  data: DiggingPublic[];
+  pagination: {
+    page: number;
+    limit: number;
+    total: number;
+    totalPages: number;
+    hasMore: boolean;
+  };
+}
+
+export function getPublicDiggings(page = 1, limit = 20, hashtag?: string) {
+  const params = new URLSearchParams();
+  params.append("page", String(page));
+  params.append("limit", String(limit));
+  if (hashtag) params.append("hashtag", hashtag);
+  return fetchAPI<DiggingPublicResponse>(`/digging/public?${params.toString()}`);
+}
+
 // 날짜+시간 포맷 유틸리티 (한국 시간대)
 export function formatDateTime(date: string | Date, includeTime = true): string {
   const d = typeof date === 'string' ? new Date(date) : date;

@@ -171,7 +171,9 @@ export class SeedController {
     data: {
       discordUserId: string;
       url: string;
+      title?: string;
       description: string;
+      hashtags?: string[];
       createdAt?: string;
     },
   ) {
@@ -213,13 +215,15 @@ export class SeedController {
           // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-assignment
           userId: user.id,
           url: data.url,
+          title: data.title || null,
           description: data.description,
+          hashtags: data.hashtags || [],
           createdAt: data.createdAt ? new Date(data.createdAt) : new Date(),
         },
       });
-    } catch (error: any) {
-      // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
-      if (error.status === HttpStatus.CONFLICT) throw error;
+    } catch (error: unknown) {
+      const httpError = error as { status?: number };
+      if (httpError.status === HttpStatus.CONFLICT) throw error;
       throw new HttpException('Digging seed failed', HttpStatus.INTERNAL_SERVER_ERROR);
     }
   }

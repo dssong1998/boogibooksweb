@@ -7,6 +7,7 @@ import {
   Param,
   Delete,
   Headers,
+  Query,
   UnauthorizedException,
 } from '@nestjs/common';
 import { DiggingService } from './digging.service';
@@ -42,10 +43,25 @@ export class DiggingController {
     return this.diggingService.createFromBot(createDiggingFromBotDto);
   }
 
+  // 내 디깅만 조회
   @Get()
   findAll(@Headers('Authorization') authHeader: string) {
     const userId = this.getUserId(authHeader);
     return this.diggingService.findAll(userId);
+  }
+
+  // 전체 공개 디깅 조회 (페이지네이션)
+  @Get('public')
+  findAllPublic(
+    @Query('page') page?: string,
+    @Query('limit') limit?: string,
+    @Query('hashtag') hashtag?: string,
+  ) {
+    return this.diggingService.findAllPublic(
+      page ? parseInt(page, 10) : 1,
+      limit ? parseInt(limit, 10) : 20,
+      hashtag,
+    );
   }
 
   @Get(':id')

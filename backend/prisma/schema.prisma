@@ -121,7 +121,9 @@ model Digging {
   userId      String
   user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
   url         String
-  description String
+  title       String?  // 링크 제목
+  description String   // 메시지 본문
+  hashtags    String[] // 해시태그 배열
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 }

@@ -7,6 +7,7 @@ export default [
   route("dashboard", "routes/dashboard.tsx"),
   route("calendar", "routes/calendar.tsx"),
   route("digging", "routes/digging.tsx"),
+  route("digging/explore", "routes/digging.explore.tsx"),
   route("events", "routes/events.tsx"),
   route("events/:id/apply", "routes/events.$id.apply.tsx"),
   route("payment", "routes/payment.tsx"),
@@ -17,4 +18,5 @@ export default [
   route("admin/events/create", "routes/admin.events.create.tsx"),
   route("admin/monthly-book/create", "routes/admin.monthly-book.create.tsx"),
   route("admin/calendar/create", "routes/admin.calendar.create.tsx"),
+  route("bucket", "routes/bucket.tsx"),
 ] satisfies RouteConfig;

@@ -40,7 +40,7 @@ export class AuthController {
         // eslint-disable-next-line @typescript-eslint/no-unsafe-argument, @typescript-eslint/no-unsafe-member-access
         oauthTokenData.access_token,
       );
-
+      console.log('guildMemberInfo:', guildMemberInfo);
       // 서버 별명이 있으면 사용, 없으면 Discord 표시 이름, 그것도 없으면 유저네임
       // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
       const displayName =

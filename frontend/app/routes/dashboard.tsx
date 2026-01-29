@@ -9,6 +9,7 @@ import {
   getWeekSchedules,
   getCurrentMonthlyBooks,
   getMyTableLogStats,
+  getMonthlyLeaderboard,
   getMe,
   type UserData,
   type BookData,
@@ -17,6 +18,7 @@ import {
   type ScheduleData,
   type MonthlyBookData,
   type TableLogStats,
+  type MonthlyLeaderboard,
 } from "../lib/api";
 
 export function meta({}: Route.MetaArgs) {
@@ -57,6 +59,7 @@ export default function Dashboard() {
   const [schedules, setSchedules] = useState<ScheduleData[]>([]);
   const [monthlyBooks, setMonthlyBooks] = useState<MonthlyBookData[]>([]);
   const [tableLogStats, setTableLogStats] = useState<TableLogStats | null>(null);
+  const [monthlyLeaderboard, setMonthlyLeaderboard] = useState<MonthlyLeaderboard | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
@@ -86,16 +89,18 @@ export default function Dashboard() {
           getWeekSchedules().catch((e) => { console.error("getWeekSchedules failed:", e); return []; }),
           getCurrentMonthlyBooks().catch((e) => { console.error("getCurrentMonthlyBooks failed:", e); return []; }),
           getMyTableLogStats().catch((e) => { console.error("getMyTableLogStats failed:", e); return null; }),
+          getMonthlyLeaderboard().catch((e) => { console.error("getMonthlyLeaderboard failed:", e); return null; }),
           getMe().catch((e) => { console.error("getMe failed:", e); return null; }),
         ]);
         
-        const [booksData, eventsData, diggingsData, schedulesData, monthlyBooksData, tableLogData, userData] = results;
+        const [booksData, eventsData, diggingsData, schedulesData, monthlyBooksData, tableLogData, leaderboardData, userData] = results;
         setBooks(Array.isArray(booksData) ? booksData : []);
         setEvents(Array.isArray(eventsData) ? eventsData : []);
         setDiggings(Array.isArray(diggingsData) ? diggingsData : []);
         setSchedules(Array.isArray(schedulesData) ? schedulesData : []);
         setMonthlyBooks(Array.isArray(monthlyBooksData) ? monthlyBooksData : []);
         setTableLogStats(tableLogData);
+        setMonthlyLeaderboard(leaderboardData);
         setUser(userData);
         console.log("Dashboard data set successfully");
       } catch (error) {
@@ -294,7 +299,8 @@ export default function Dashboard() {
 
           {/* Additional Stats */}
           <div className="mt-6 pt-6 border-t border-gray-200 dark:border-gray-700">
-            <div className="grid grid-cols-2 md:grid-cols-3 gap-4 text-sm">
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
+              {/* 이번 달 식탁 횟수 + TOP 3 */}
               <div>
                 <span className="text-gray-500 dark:text-gray-400">
                   이번 달 식탁
@@ -302,7 +308,71 @@ export default function Dashboard() {
                 <p className="text-gray-900 dark:text-white font-medium mt-1">
                   {tableLogStats?.monthlyStats?.[0]?.count ?? 0}회
                 </p>
+                {monthlyLeaderboard && monthlyLeaderboard.visitLeaderboard.length > 0 && (
+                  <div className="flex items-center gap-1 mt-1.5">
+                    {monthlyLeaderboard.visitLeaderboard.slice(0, 3).map((e, i) => {
+                      const medal = i === 0 ? "🥇" : i === 1 ? "🥈" : "🥉";
+                      const isMe = e.userId === user.id;
+                      return (
+                        <span
+                          key={e.discordId}
+                          title={`${e.username} (${e.visitCount}회)`}
+                          className={`text-xs px-1.5 py-0.5 rounded cursor-default ${
+                            isMe
+                              ? "bg-amber-100 dark:bg-amber-900/40 text-amber-700 dark:text-amber-300 font-medium"
+                              : "bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-400"
+                          }`}
+                        >
+                          {medal}{e.username.slice(0, 3)}
+                        </span>
+                      );
+                    })}
+                  </div>
+                )}
               </div>
+
+              {/* 이번 달 이용시간 + TOP 3 */}
+              <div>
+                <span className="text-gray-500 dark:text-gray-400">
+                  이번 달 이용시간
+                </span>
+                <p className="text-gray-900 dark:text-white font-medium mt-1">
+                  {monthlyLeaderboard ? (() => {
+                    const myEntry = monthlyLeaderboard.timeLeaderboard.find(e => e.userId === user.id);
+                    if (myEntry) {
+                      const h = Math.floor(myEntry.totalMinutes / 60);
+                      const m = myEntry.totalMinutes % 60;
+                      return h > 0 ? `${h}시간 ${m}분` : `${m}분`;
+                    }
+                    return "0분";
+                  })() : "0분"}
+                </p>
+                {monthlyLeaderboard && monthlyLeaderboard.timeLeaderboard.length > 0 && (
+                  <div className="flex items-center gap-1 mt-1.5">
+                    {monthlyLeaderboard.timeLeaderboard.slice(0, 3).map((e, i) => {
+                      const medal = i === 0 ? "🥇" : i === 1 ? "🥈" : "🥉";
+                      const isMe = e.userId === user.id;
+                      const h = Math.floor(e.totalMinutes / 60);
+                      const m = e.totalMinutes % 60;
+                      const timeStr = h > 0 ? `${h}시간 ${m}분` : `${m}분`;
+                      return (
+                        <span
+                          key={e.discordId}
+                          title={`${e.username} (${timeStr})`}
+                          className={`text-xs px-1.5 py-0.5 rounded cursor-default ${
+                            isMe
+                              ? "bg-amber-100 dark:bg-amber-900/40 text-amber-700 dark:text-amber-300 font-medium"
+                              : "bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-400"
+                          }`}
+                        >
+                          {medal}{e.username.slice(0, 3)}
+                        </span>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+
               <div>
                 <span className="text-gray-500 dark:text-gray-400">
                   총 식탁 참여
@@ -584,12 +654,20 @@ export default function Dashboard() {
                   디깅박스
                 </h2>
               </div>
-              <button
-                onClick={() => navigate("/digging")}
-                className="text-xs text-purple-600 hover:text-purple-700 dark:text-purple-400 dark:hover:text-purple-300 font-medium"
-              >
-                더보기 →
-              </button>
+              <div className="flex items-center space-x-3">
+                <button
+                  onClick={() => navigate("/digging/explore")}
+                  className="text-xs text-indigo-600 hover:text-indigo-700 dark:text-indigo-400 dark:hover:text-indigo-300 font-medium"
+                >
+                  🔍 탐험하기
+                </button>
+                <button
+                  onClick={() => navigate("/digging")}
+                  className="text-xs text-purple-600 hover:text-purple-700 dark:text-purple-400 dark:hover:text-purple-300 font-medium"
+                >
+                  내 디깅 →
+                </button>
+              </div>
             </div>
             <div className="flex-1 flex flex-col justify-between">
               {recentDigging ? (

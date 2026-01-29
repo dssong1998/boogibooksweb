@@ -218,4 +218,115 @@ export class TableLogsController {
 
     return leaderboard;
   }
+
+  // 월간 리더보드 (이용시간 + 이용횟수)
+  @Get('monthly-leaderboard')
+  async getMonthlyLeaderboard(
+    @Query('year') year?: string,
+    @Query('month') month?: string,
+  ) {
+    const now = new Date();
+    const targetYear = year ? parseInt(year) : now.getFullYear();
+    const targetMonth = month ? parseInt(month) : now.getMonth() + 1;
+
+    const startDate = new Date(targetYear, targetMonth - 1, 1);
+    const endDate = new Date(targetYear, targetMonth, 0, 23, 59, 59);
+
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access
+    const logs = await (this.prisma as any).tableLog.findMany({
+      where: {
+        date: {
+          gte: startDate,
+          lte: endDate,
+        },
+      },
+    });
+
+    // 유저별 이용시간 및 횟수 계산
+    const userStatsMap = new Map<
+      string,
+      { totalMinutes: number; visitCount: number; dates: Set<string> }
+    >();
+
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-call
+    logs.forEach((log: { discordUserId: string; date: Date; channelName: string | null }) => {
+      if (!userStatsMap.has(log.discordUserId)) {
+        userStatsMap.set(log.discordUserId, {
+          totalMinutes: 0,
+          visitCount: 0,
+          dates: new Set(),
+        });
+      }
+      const stats = userStatsMap.get(log.discordUserId)!;
+
+      // channelName에서 duration 추출 (형식: "VOICE_LEAVE:식탁:username:30분")
+      if (log.channelName) {
+        const parts = log.channelName.split(':');
+        if (parts[0] === 'VOICE_LEAVE' && parts.length >= 4) {
+          const durationStr = parts[parts.length - 1];
+          const minutes = parseInt(durationStr.replace('분', ''));
+          if (!isNaN(minutes)) {
+            stats.totalMinutes += minutes;
+          }
+        }
+        // 방문 횟수는 JOIN 또는 모든 기록 카운트
+        if (parts[0] === 'VOICE_JOIN' || !parts[0].startsWith('VOICE_')) {
+          stats.visitCount += 1;
+        }
+      } else {
+        // 이전 형식의 로그 (channelName만 있음)
+        stats.visitCount += 1;
+      }
+
+      const dateStr = log.date.toISOString().split('T')[0];
+      stats.dates.add(dateStr);
+    });
+
+    // 유저 정보 가져오기
+    const discordIds = Array.from(userStatsMap.keys());
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access
+    const users = await (this.prisma as any).user.findMany({
+      where: { discordId: { in: discordIds } },
+      select: { id: true, discordId: true, username: true },
+    });
+
+    const userMap = new Map<string, { id: string; username: string }>();
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-call
+    users.forEach((u: { id: string; discordId: string; username: string }) => {
+      userMap.set(u.discordId, { id: u.id, username: u.username });
+    });
+
+    // 이용시간 기준 정렬
+    const timeLeaderboard = Array.from(userStatsMap.entries())
+      .map(([discordId, stats]) => ({
+        discordId,
+        userId: userMap.get(discordId)?.id,
+        username: userMap.get(discordId)?.username || `User_${discordId.slice(-4)}`,
+        totalMinutes: stats.totalMinutes,
+        visitCount: stats.visitCount,
+        uniqueDays: stats.dates.size,
+      }))
+      .filter((u) => u.totalMinutes > 0)
+      .sort((a, b) => b.totalMinutes - a.totalMinutes);
+
+    // 방문횟수 기준 정렬
+    const visitLeaderboard = Array.from(userStatsMap.entries())
+      .map(([discordId, stats]) => ({
+        discordId,
+        userId: userMap.get(discordId)?.id,
+        username: userMap.get(discordId)?.username || `User_${discordId.slice(-4)}`,
+        totalMinutes: stats.totalMinutes,
+        visitCount: stats.visitCount,
+        uniqueDays: stats.dates.size,
+      }))
+      .filter((u) => u.visitCount > 0)
+      .sort((a, b) => b.visitCount - a.visitCount);
+
+    return {
+      year: targetYear,
+      month: targetMonth,
+      timeLeaderboard: timeLeaderboard.slice(0, 10),
+      visitLeaderboard: visitLeaderboard.slice(0, 10),
+    };
+  }
 }
