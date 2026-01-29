@@ -279,7 +279,22 @@ export class AuthService {
       throw new UnauthorizedException('User not found');
     }
 
+    // 실시간으로 books 수 카운트
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-assignment
+    const booksCount = await (this.prisma as any).book.count({
+      where: { userId },
+    });
+
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-assignment
+    const diggingsCount = await (this.prisma as any).digging.count({
+      where: { userId },
+    });
+
     // eslint-disable-next-line @typescript-eslint/no-unsafe-return
-    return user;
+    return {
+      ...user,
+      totalBooksRead: booksCount,
+      diggingsCount,
+    };
   }
 }

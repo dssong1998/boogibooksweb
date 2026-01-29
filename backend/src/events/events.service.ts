@@ -91,7 +91,7 @@ export class EventsService {
 
     if (!botToken || !libraryChannelId) {
       console.warn('Discord bot token or library channel ID not configured');
-      return { hasActivity: true, messageCount: 0 };
+      return { hasActivity: false, messageCount: 0 };
     }
 
     // 메시지가 조건에 맞는지 확인하는 헬퍼 함수
@@ -161,6 +161,7 @@ export class EventsService {
             const threadTimestamp =
               Number(BigInt(thread.id) >> BigInt(22)) + discordEpoch;
             if (threadTimestamp >= firstDayOfMonth.getTime()) {
+              isValid = true;
               totalValidCount++;
             }
           }
@@ -183,9 +184,9 @@ export class EventsService {
               for (const msg of msgs) {
                 if (msg.author.id === discordUserId) {
                   count++;
-                }
-                if (!isValid && isValidMessage(msg.content)) {
-                  isValid = true;
+                  if (!isValid && isValidMessage(msg.content)) {
+                    isValid = true;
+                  }
                 }
               }
               return count;
@@ -204,7 +205,7 @@ export class EventsService {
       };
     } catch (error) {
       console.error('Error checking library activity:', error);
-      return { hasActivity: true, messageCount: 0 };
+      return { hasActivity: false, messageCount: 0 };
     }
   }
 
@@ -223,6 +224,7 @@ export class EventsService {
     price: number;
     eventType: string;
     isTerras: boolean;
+    isNewMember: boolean;
     isFree: boolean;
     libraryMessageCount: number;
     alreadyApplied: boolean;
@@ -240,6 +242,7 @@ export class EventsService {
 
     /* eslint-disable @typescript-eslint/no-unsafe-member-access */
     const isTerras = user.isTerras as boolean;
+    const isNewMember = user.isNewMember as boolean;
     const eventPrice = event.price as number;
     const eventType = event.eventType as string;
     const maxParticipants = event.maxParticipants as number;
@@ -250,7 +253,8 @@ export class EventsService {
     const currentParticipants = (event.applications?.length ?? 0) as number;
     /* eslint-enable @typescript-eslint/no-unsafe-member-access */
 
-    const isFree = isTerras;
+    // 테라스 멤버 또는 뉴멤버는 무료
+    const isFree = isTerras || isNewMember;
 
     // 이미 신청했는지 확인
     /* eslint-disable @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access */
@@ -261,8 +265,10 @@ export class EventsService {
     });
     /* eslint-enable @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access */
 
-    // 서재 활동 확인
-    const libraryActivity = await this.checkLibraryActivity(discordId);
+    // 서재 활동 확인 (뉴멤버는 스킵)
+    const libraryActivity = isNewMember
+      ? { hasActivity: true, messageCount: 0 }
+      : await this.checkLibraryActivity(discordId);
 
     const currentOrder = currentParticipants + 1;
     const isOverCapacity = currentOrder > maxParticipants;
@@ -283,6 +289,7 @@ export class EventsService {
         price: eventPrice,
         eventType,
         isTerras,
+        isNewMember,
         isFree,
         libraryMessageCount: libraryActivity.messageCount,
         alreadyApplied: true,
@@ -290,7 +297,8 @@ export class EventsService {
       };
     }
 
-    if (!libraryActivity.hasActivity) {
+    // 뉴멤버가 아닌 경우에만 서재 활동 체크
+    if (!isNewMember && !libraryActivity.hasActivity) {
       return {
         eligible: false,
         reason:
@@ -303,6 +311,7 @@ export class EventsService {
         price: eventPrice,
         eventType,
         isTerras,
+        isNewMember,
         isFree,
         libraryMessageCount: libraryActivity.messageCount,
         alreadyApplied: false,
@@ -319,6 +328,7 @@ export class EventsService {
       price: eventPrice,
       eventType,
       isTerras,
+      isNewMember,
       isFree,
       libraryMessageCount: libraryActivity.messageCount,
       alreadyApplied: false,
@@ -354,6 +364,7 @@ export class EventsService {
 
     /* eslint-disable @typescript-eslint/no-unsafe-member-access */
     const isTerras = user.isTerras as boolean;
+    const isNewMember = user.isNewMember as boolean;
     const discordId = user.discordId as string;
     const userCoins = user.coins as number;
     const requiredCoins = event.requiredCoins as number;
@@ -374,9 +385,12 @@ export class EventsService {
       throw new BadRequestException('이미 이 이벤트에 신청하셨습니다.');
     }
 
-    // 서재 활동 확인 (전체 카운트)
-    const libraryActivity = await this.checkLibraryActivity(discordId);
-    if (!libraryActivity.hasActivity) {
+    // 서재 활동 확인 (뉴멤버는 스킵)
+    const libraryActivity = isNewMember
+      ? { hasActivity: true, messageCount: 0 }
+      : await this.checkLibraryActivity(discordId);
+
+    if (!isNewMember && !libraryActivity.hasActivity) {
       throw new ForbiddenException(
         '이번 달 서재 채널에 유효한 글을 1개 이상 작성해야 신청할 수 있습니다.',
       );
@@ -388,9 +402,12 @@ export class EventsService {
     let usedCoins = 0;
     let status = 'PENDING'; // 기본: 관리자 승인 대기
 
-    // 테라스 멤버도 PENDING으로 시작 (관리자 승인 대기)
+    // 뉴멤버: 바로 CONFIRMED (승인 없이 확정)
+    if (isNewMember) {
+      status = 'CONFIRMED';
+    }
     // 코인 사용: COIN_GUARANTEED (정원 외 보장)
-    if (useCoins) {
+    else if (useCoins) {
       if (userCoins < requiredCoins) {
         throw new BadRequestException(
           `코인이 부족합니다. 필요: ${requiredCoins}, 보유: ${userCoins}`,
@@ -408,7 +425,7 @@ export class EventsService {
     }
     // 일반 신청: PENDING (관리자 승인 대기)
 
-    // 신청 생성 (서재 활동 수 기록)
+    // 신청 생성 (서재 활동 수, 뉴멤버 여부 기록)
     // eslint-disable-next-line @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access
     await (this.prisma as any).eventApplication.create({
       data: {
@@ -426,14 +443,44 @@ export class EventsService {
         status,
         usedCoins,
         libraryMessageCount: libraryActivity.messageCount,
-        paidAt: null, // 모든 신청자는 승인 후 확정됨
+        isNewMember, // 신청 시점의 뉴멤버 여부 기록
+        paidAt: isNewMember ? new Date() : null, // 뉴멤버는 바로 확정
+        approvedAt: isNewMember ? new Date() : null,
       },
     });
+
+    // 뉴멤버는 isNewMember 플래그 해제 (첫 모임 무료 혜택 사용)
+    if (isNewMember) {
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access
+      await (this.prisma as any).user.update({
+        where: { id: userId },
+        data: { isNewMember: false },
+      });
+
+      // 뉴멤버에게 참석 확정 DM 전송
+      /* eslint-disable @typescript-eslint/no-unsafe-member-access */
+      const eventTitle = event.title as string;
+      const eventLocation = event.location as string;
+      const eventDate = event.date as Date;
+      /* eslint-enable @typescript-eslint/no-unsafe-member-access */
+
+      await this.sendConfirmationDM(
+        discordId,
+        eventTitle,
+        eventLocation,
+        eventDate,
+        false,
+        0,
+        true, // isNewMember
+      );
+    }
 
     // 참가자 수는 applications 배열 길이로 자동 계산되므로 별도 업데이트 불필요
 
     let message: string;
-    if (useCoins) {
+    if (isNewMember) {
+      message = `🎉 ${applicationOrder}번째로 참석이 확정되었습니다! (뉴멤버 첫 모임 무료) 디스코드 DM으로 이벤트 정보가 전송되었습니다.`;
+    } else if (useCoins) {
       message = `${applicationOrder}번째로 신청되었습니다. 코인 ${usedCoins}개를 사용하여 정원 외 보장됩니다. 정원이 차면 자동으로 참석이 확정됩니다.`;
     } else if (isTerras) {
       message = `${applicationOrder}번째로 신청되었습니다. 관리자 승인 후 참석 확정 안내를 받으실 수 있습니다. (테라스 멤버 무료)`;
@@ -448,24 +495,27 @@ export class EventsService {
       applicationOrder,
       status,
       usedCoins,
-      isFree: isTerras,
+      isFree: isTerras || isNewMember, // 테라스 또는 뉴멤버는 무료
       message,
       libraryMessageCount: libraryActivity.messageCount,
     };
   }
 
   // 관리자: 신청 승인 (여러 명 동시 승인 가능)
-  // 테라스 멤버 → CONFIRMED + 참석 확정 DM
+  // 테라스 멤버/뉴멤버 → CONFIRMED + 참석 확정 DM
   // 일반 멤버 → APPROVED + 결제 안내 DM
   // 코인 사용자 승인 시 → 코인 반환 + 이달의 멤버 선정 DM
+  // finalizeApproval=true → 미승인 PENDING 신청자에게 거절 DM 전송
   async approveApplications(
     eventId: string,
     applicationIds: string[],
+    finalizeApproval: boolean = false,
   ): Promise<{
     approved: number;
     coinRefunded: { userId: string; coins: number; discordId: string }[];
     dmSent: number;
     autoApprovedCoinUsers: number;
+    rejectedCount: number;
   }> {
     // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
     const event = await this.findOne(eventId);
@@ -484,7 +534,8 @@ export class EventsService {
       coins: number;
       discordId: string;
     }[] = [];
-    const terrasUsers: { discordId: string }[] = [];
+    // 테라스 멤버와 뉴멤버 (무료 확정)
+    const freeUsers: { discordId: string; isNewMember: boolean }[] = [];
     const paymentUsers: {
       userId: string;
       discordId: string;
@@ -510,6 +561,7 @@ export class EventsService {
       const appUserId = application.userId as string;
       const userDiscordId = application.user.discordId as string;
       const userIsTerras = application.user.isTerras as boolean;
+      const appIsNewMember = application.isNewMember as boolean; // 신청 시점의 뉴멤버 여부
       const appOrder = application.applicationOrder as number;
 
       // 코인 사용자가 승인되면 코인 반환 + 이달의 멤버 선정
@@ -547,8 +599,8 @@ export class EventsService {
         continue;
       }
 
-      // 테라스 멤버: CONFIRMED + 참석 확정 DM
-      if (userIsTerras) {
+      // 테라스 멤버 또는 뉴멤버: CONFIRMED + 참석 확정 DM (무료)
+      if (userIsTerras || appIsNewMember) {
         await (this.prisma as any).eventApplication.update({
           where: { id: appId },
           data: {
@@ -557,7 +609,18 @@ export class EventsService {
             paidAt: new Date(),
           },
         });
-        terrasUsers.push({ discordId: userDiscordId });
+        freeUsers.push({
+          discordId: userDiscordId,
+          isNewMember: appIsNewMember,
+        });
+
+        // 뉴멤버가 승인되면 isNewMember 플래그 해제 (첫 모임 무료 혜택 사용)
+        if (appIsNewMember) {
+          await (this.prisma as any).user.update({
+            where: { id: appUserId },
+            data: { isNewMember: false },
+          });
+        }
       } else {
         // 일반 멤버: APPROVED + 결제 안내 DM
         await (this.prisma as any).eventApplication.update({
@@ -576,8 +639,8 @@ export class EventsService {
     // DM 전송
     let dmSent = 0;
 
-    // 테라스 멤버에게 참석 확정 DM
-    for (const user of terrasUsers) {
+    // 테라스 멤버/뉴멤버에게 참석 확정 DM
+    for (const user of freeUsers) {
       const sent = await this.sendConfirmationDM(
         user.discordId,
         eventTitle,
@@ -585,6 +648,7 @@ export class EventsService {
         eventDate,
         false,
         0,
+        user.isNewMember, // 뉴멤버 여부 전달
       );
       if (sent) dmSent++;
     }
@@ -613,12 +677,68 @@ export class EventsService {
       maxParticipants,
     );
 
+    // finalizeApproval이 true면 미승인 PENDING 신청자에게 거절 DM 전송
+    let rejectedCount = 0;
+    if (finalizeApproval) {
+      rejectedCount = await this.sendRejectionToRemainingApplicants(
+        eventId,
+        eventTitle,
+      );
+    }
+
     return {
       approved: applicationIds.length,
       coinRefunded,
       dmSent,
       autoApprovedCoinUsers: autoApproved,
+      rejectedCount,
     };
+  }
+
+  // 미승인 PENDING 신청자에게 거절 DM 전송
+  private async sendRejectionToRemainingApplicants(
+    eventId: string,
+    eventTitle: string,
+  ): Promise<number> {
+    /* eslint-disable @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access */
+    // PENDING 또는 COIN_GUARANTEED 상태의 신청자들 조회
+    const pendingApplications = await (
+      this.prisma as any
+    ).eventApplication.findMany({
+      where: {
+        eventId,
+        status: { in: ['PENDING', 'COIN_GUARANTEED'] },
+      },
+      include: { user: true },
+    });
+
+    let rejectedCount = 0;
+    for (const app of pendingApplications as any[]) {
+      const userDiscordId = app.user.discordId as string;
+      const usedCoins = app.usedCoins as number;
+      const appUserId = app.userId as string;
+
+      // 코인 사용자는 코인 환불
+      if (usedCoins > 0) {
+        await (this.prisma as any).user.update({
+          where: { id: appUserId },
+          data: { coins: { increment: usedCoins } },
+        });
+      }
+
+      // 상태를 CANCELLED로 변경
+      await (this.prisma as any).eventApplication.update({
+        where: { id: app.id },
+        data: { status: 'CANCELLED' },
+      });
+
+      // 거절 DM 전송
+      const sent = await this.sendRejectionDM(userDiscordId, eventTitle);
+      if (sent) rejectedCount++;
+    }
+    /* eslint-enable @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access */
+
+    return rejectedCount;
   }
 
   // 정원 도달 시 코인 사용자 자동 승인
@@ -674,7 +794,7 @@ export class EventsService {
     return autoApproved;
   }
 
-  // 참석 확정 DM (테라스 멤버 또는 코인 반환 시)
+  // 참석 확정 DM (테라스 멤버, 뉴멤버 또는 코인 반환 시)
   private async sendConfirmationDM(
     discordId: string,
     eventTitle: string,
@@ -682,6 +802,7 @@ export class EventsService {
     date: Date,
     isCoinRefunded: boolean,
     refundedCoins: number,
+    isNewMember: boolean = false,
   ): Promise<boolean> {
     const dateStr = date.toLocaleString('ko-KR', {
       timeZone: 'Asia/Seoul',
@@ -706,11 +827,31 @@ export class EventsService {
       });
     }
 
+    let description = '당일 뵙겠습니다! 🙌';
+    if (isNewMember) {
+      description =
+        '🌟 뉴멤버 첫 모임 무료 혜택으로 참석이 확정되었습니다!\n당일 뵙겠습니다! 🙌';
+    }
+
     return this.sendDiscordDM(discordId, {
       title: `🎉 [${eventTitle}] 참석 확정!`,
-      description: '당일 뵙겠습니다! 🙌',
+      description,
       color: 0x57f287, // 초록색
       fields,
+    });
+  }
+
+  // 거절 DM (승인되지 않은 신청자에게)
+  private async sendRejectionDM(
+    discordId: string,
+    eventTitle: string,
+  ): Promise<boolean> {
+    return this.sendDiscordDM(discordId, {
+      title: `📬 [${eventTitle}] 신청 결과 안내`,
+      description:
+        '안타깝게도 이번 모임에 참석이 어렵게 되었습니다.\n\n다음 모임에서 뵙기를 기대합니다! 🙏',
+      color: 0xed4245, // 빨간색
+      fields: [],
     });
   }
 
@@ -767,6 +908,7 @@ export class EventsService {
       libraryMessageCount: app.libraryMessageCount as number,
       createdAt: app.createdAt as Date,
       isTerras: app.user.isTerras as boolean,
+      isNewMember: app.isNewMember as boolean, // 신청 시점의 뉴멤버 여부
     }));
     /* eslint-enable @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access */
   }

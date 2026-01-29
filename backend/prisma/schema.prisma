@@ -44,6 +44,7 @@ model EventApplication {
   status              EventApplicationStatus    @default(PENDING)
   usedCoins           Int                       @default(0)
   libraryMessageCount Int                       @default(0) // 서재 활동 수 (신청 시점)
+  isNewMember         Boolean                   @default(false) // 뉴멤버 여부 (신청 시점)
   paidAt              DateTime?                 // 결제 완료 시간
   approvedAt          DateTime?                 // 관리자 승인 시간
   createdAt           DateTime                  @default(now())
@@ -67,17 +68,12 @@ model User {
   email                 String?
   role                  UserRole  @default(VISITOR)
   isTerras              Boolean   @default(false) // 테라스 멤버 여부
+  isNewMember           Boolean   @default(false) // 뉴멤버 여부 (첫 모임 무료)
   coins                 Int       @default(0)
   books                 Book[]
   comments              Comment[]
   diggings              Digging[]
   eventApplications     EventApplication[]
-  // 통계 필드
-  totalBooksRead        Int       @default(0)
-  voiceChannelMinutes   Int       @default(0)
-  voiceChannelDays      Int       @default(0)
-  attendanceRate        Float     @default(0)
-  eventsParticipated    Int       @default(0)
   createdAt             DateTime  @default(now())
   updatedAt             DateTime  @updatedAt
 }

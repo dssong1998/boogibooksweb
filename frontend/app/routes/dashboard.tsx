@@ -28,8 +28,6 @@ export function meta({}: Route.MetaArgs) {
   ];
 }
 
-
-
 interface WeeklyScheduleItem {
   id: string;
   title: string;
@@ -58,8 +56,11 @@ export default function Dashboard() {
   const [diggings, setDiggings] = useState<DiggingData[]>([]);
   const [schedules, setSchedules] = useState<ScheduleData[]>([]);
   const [monthlyBooks, setMonthlyBooks] = useState<MonthlyBookData[]>([]);
-  const [tableLogStats, setTableLogStats] = useState<TableLogStats | null>(null);
-  const [monthlyLeaderboard, setMonthlyLeaderboard] = useState<MonthlyLeaderboard | null>(null);
+  const [tableLogStats, setTableLogStats] = useState<TableLogStats | null>(
+    null,
+  );
+  const [monthlyLeaderboard, setMonthlyLeaderboard] =
+    useState<MonthlyLeaderboard | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
@@ -69,7 +70,6 @@ export default function Dashboard() {
       navigate("/");
       return;
     }
-
   }, [navigate]);
 
   useEffect(() => {
@@ -83,22 +83,57 @@ export default function Dashboard() {
       console.log("Dashboard loading started...");
       try {
         const results = await Promise.all([
-          getBooks().catch((e) => { console.error("getBooks failed:", e); return []; }),
-          getEvents().catch((e) => { console.error("getEvents failed:", e); return []; }),
-          getDiggings().catch((e) => { console.error("getDiggings failed:", e); return []; }),
-          getWeekSchedules().catch((e) => { console.error("getWeekSchedules failed:", e); return []; }),
-          getCurrentMonthlyBooks().catch((e) => { console.error("getCurrentMonthlyBooks failed:", e); return []; }),
-          getMyTableLogStats().catch((e) => { console.error("getMyTableLogStats failed:", e); return null; }),
-          getMonthlyLeaderboard().catch((e) => { console.error("getMonthlyLeaderboard failed:", e); return null; }),
-          getMe().catch((e) => { console.error("getMe failed:", e); return null; }),
+          getBooks().catch((e) => {
+            console.error("getBooks failed:", e);
+            return [];
+          }),
+          getEvents().catch((e) => {
+            console.error("getEvents failed:", e);
+            return [];
+          }),
+          getDiggings().catch((e) => {
+            console.error("getDiggings failed:", e);
+            return [];
+          }),
+          getWeekSchedules().catch((e) => {
+            console.error("getWeekSchedules failed:", e);
+            return [];
+          }),
+          getCurrentMonthlyBooks().catch((e) => {
+            console.error("getCurrentMonthlyBooks failed:", e);
+            return [];
+          }),
+          getMyTableLogStats().catch((e) => {
+            console.error("getMyTableLogStats failed:", e);
+            return null;
+          }),
+          getMonthlyLeaderboard().catch((e) => {
+            console.error("getMonthlyLeaderboard failed:", e);
+            return null;
+          }),
+          getMe().catch((e) => {
+            console.error("getMe failed:", e);
+            return null;
+          }),
         ]);
-        
-        const [booksData, eventsData, diggingsData, schedulesData, monthlyBooksData, tableLogData, leaderboardData, userData] = results;
+
+        const [
+          booksData,
+          eventsData,
+          diggingsData,
+          schedulesData,
+          monthlyBooksData,
+          tableLogData,
+          leaderboardData,
+          userData,
+        ] = results;
         setBooks(Array.isArray(booksData) ? booksData : []);
         setEvents(Array.isArray(eventsData) ? eventsData : []);
         setDiggings(Array.isArray(diggingsData) ? diggingsData : []);
         setSchedules(Array.isArray(schedulesData) ? schedulesData : []);
-        setMonthlyBooks(Array.isArray(monthlyBooksData) ? monthlyBooksData : []);
+        setMonthlyBooks(
+          Array.isArray(monthlyBooksData) ? monthlyBooksData : [],
+        );
         setTableLogStats(tableLogData);
         setMonthlyLeaderboard(leaderboardData);
         setUser(userData);
@@ -185,7 +220,7 @@ export default function Dashboard() {
 
     // Combine and sort
     return [...eventItems, ...scheduleItems].sort(
-      (a, b) => new Date(a.date).getTime() - new Date(b.date).getTime()
+      (a, b) => new Date(a.date).getTime() - new Date(b.date).getTime(),
     );
   }, [events, schedules]);
 
@@ -264,7 +299,7 @@ export default function Dashboard() {
             <div className="grid grid-cols-2 md:grid-cols-4 gap-4 flex-1">
               <div className="text-center p-3 bg-amber-50 dark:bg-amber-900/20 rounded-lg">
                 <div className="text-2xl font-bold text-amber-600 dark:text-amber-400">
-                  {user.totalBooksRead ?? books.length}
+                  {user.totalBooksRead ?? 0}
                 </div>
                 <div className="text-xs text-gray-600 dark:text-gray-400">
                   읽은 책
@@ -308,27 +343,31 @@ export default function Dashboard() {
                 <p className="text-gray-900 dark:text-white font-medium mt-1">
                   {tableLogStats?.monthlyStats?.[0]?.count ?? 0}회
                 </p>
-                {monthlyLeaderboard && monthlyLeaderboard.visitLeaderboard.length > 0 && (
-                  <div className="flex items-center gap-1 mt-1.5">
-                    {monthlyLeaderboard.visitLeaderboard.slice(0, 3).map((e, i) => {
-                      const medal = i === 0 ? "🥇" : i === 1 ? "🥈" : "🥉";
-                      const isMe = e.userId === user.id;
-                      return (
-                        <span
-                          key={e.discordId}
-                          title={`${e.username} (${e.visitCount}회)`}
-                          className={`text-xs px-1.5 py-0.5 rounded cursor-default ${
-                            isMe
-                              ? "bg-amber-100 dark:bg-amber-900/40 text-amber-700 dark:text-amber-300 font-medium"
-                              : "bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-400"
-                          }`}
-                        >
-                          {medal}{e.username.slice(0, 3)}
-                        </span>
-                      );
-                    })}
-                  </div>
-                )}
+                {monthlyLeaderboard &&
+                  monthlyLeaderboard.visitLeaderboard.length > 0 && (
+                    <div className="flex items-center gap-1 mt-1.5">
+                      {monthlyLeaderboard.visitLeaderboard
+                        .slice(0, 3)
+                        .map((e, i) => {
+                          const medal = i === 0 ? "🥇" : i === 1 ? "🥈" : "🥉";
+                          const isMe = e.userId === user.id;
+                          return (
+                            <span
+                              key={e.discordId}
+                              title={`${e.username} (${e.visitCount}회)`}
+                              className={`text-xs px-1.5 py-0.5 rounded cursor-default ${
+                                isMe
+                                  ? "bg-amber-100 dark:bg-amber-900/40 text-amber-700 dark:text-amber-300 font-medium"
+                                  : "bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-400"
+                              }`}
+                            >
+                              {medal}
+                              {e.username.slice(0, 3)}
+                            </span>
+                          );
+                        })}
+                    </div>
+                  )}
               </div>
 
               {/* 이번 달 이용시간 + TOP 3 */}
@@ -337,40 +376,48 @@ export default function Dashboard() {
                   이번 달 이용시간
                 </span>
                 <p className="text-gray-900 dark:text-white font-medium mt-1">
-                  {monthlyLeaderboard ? (() => {
-                    const myEntry = monthlyLeaderboard.timeLeaderboard.find(e => e.userId === user.id);
-                    if (myEntry) {
-                      const h = Math.floor(myEntry.totalMinutes / 60);
-                      const m = myEntry.totalMinutes % 60;
-                      return h > 0 ? `${h}시간 ${m}분` : `${m}분`;
-                    }
-                    return "0분";
-                  })() : "0분"}
+                  {monthlyLeaderboard
+                    ? (() => {
+                        const myEntry = monthlyLeaderboard.timeLeaderboard.find(
+                          (e) => e.userId === user.id,
+                        );
+                        if (myEntry) {
+                          const h = Math.floor(myEntry.totalMinutes / 60);
+                          const m = myEntry.totalMinutes % 60;
+                          return h > 0 ? `${h}시간 ${m}분` : `${m}분`;
+                        }
+                        return "0분";
+                      })()
+                    : "0분"}
                 </p>
-                {monthlyLeaderboard && monthlyLeaderboard.timeLeaderboard.length > 0 && (
-                  <div className="flex items-center gap-1 mt-1.5">
-                    {monthlyLeaderboard.timeLeaderboard.slice(0, 3).map((e, i) => {
-                      const medal = i === 0 ? "🥇" : i === 1 ? "🥈" : "🥉";
-                      const isMe = e.userId === user.id;
-                      const h = Math.floor(e.totalMinutes / 60);
-                      const m = e.totalMinutes % 60;
-                      const timeStr = h > 0 ? `${h}시간 ${m}분` : `${m}분`;
-                      return (
-                        <span
-                          key={e.discordId}
-                          title={`${e.username} (${timeStr})`}
-                          className={`text-xs px-1.5 py-0.5 rounded cursor-default ${
-                            isMe
-                              ? "bg-amber-100 dark:bg-amber-900/40 text-amber-700 dark:text-amber-300 font-medium"
-                              : "bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-400"
-                          }`}
-                        >
-                          {medal}{e.username.slice(0, 3)}
-                        </span>
-                      );
-                    })}
-                  </div>
-                )}
+                {monthlyLeaderboard &&
+                  monthlyLeaderboard.timeLeaderboard.length > 0 && (
+                    <div className="flex items-center gap-1 mt-1.5">
+                      {monthlyLeaderboard.timeLeaderboard
+                        .slice(0, 3)
+                        .map((e, i) => {
+                          const medal = i === 0 ? "🥇" : i === 1 ? "🥈" : "🥉";
+                          const isMe = e.userId === user.id;
+                          const h = Math.floor(e.totalMinutes / 60);
+                          const m = e.totalMinutes % 60;
+                          const timeStr = h > 0 ? `${h}시간 ${m}분` : `${m}분`;
+                          return (
+                            <span
+                              key={e.discordId}
+                              title={`${e.username} (${timeStr})`}
+                              className={`text-xs px-1.5 py-0.5 rounded cursor-default ${
+                                isMe
+                                  ? "bg-amber-100 dark:bg-amber-900/40 text-amber-700 dark:text-amber-300 font-medium"
+                                  : "bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-400"
+                              }`}
+                            >
+                              {medal}
+                              {e.username.slice(0, 3)}
+                            </span>
+                          );
+                        })}
+                    </div>
+                  )}
               </div>
 
               <div>
@@ -432,22 +479,31 @@ export default function Dashboard() {
                 const dayLabel = date.toLocaleDateString("ko-KR", {
                   weekday: "short",
                 });
-                
+
                 // 색상 결정
                 const getTagStyle = () => {
                   if (item.type === "event") {
                     return "bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300";
                   }
-                  const typeInfo = item.scheduleType ? scheduleTypeLabels[item.scheduleType] : null;
+                  const typeInfo = item.scheduleType
+                    ? scheduleTypeLabels[item.scheduleType]
+                    : null;
                   if (typeInfo) {
                     const colorMap: Record<string, string> = {
-                      indigo: "bg-indigo-100 text-indigo-800 dark:bg-indigo-900/30 dark:text-indigo-300",
-                      amber: "bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-300",
-                      purple: "bg-purple-100 text-purple-800 dark:bg-purple-900/30 dark:text-purple-300",
+                      indigo:
+                        "bg-indigo-100 text-indigo-800 dark:bg-indigo-900/30 dark:text-indigo-300",
+                      amber:
+                        "bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-300",
+                      purple:
+                        "bg-purple-100 text-purple-800 dark:bg-purple-900/30 dark:text-purple-300",
                       rose: "bg-rose-100 text-rose-800 dark:bg-rose-900/30 dark:text-rose-300",
-                      emerald: "bg-emerald-100 text-emerald-800 dark:bg-emerald-900/30 dark:text-emerald-300",
+                      emerald:
+                        "bg-emerald-100 text-emerald-800 dark:bg-emerald-900/30 dark:text-emerald-300",
                     };
-                    return colorMap[typeInfo.color] || "bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-300";
+                    return (
+                      colorMap[typeInfo.color] ||
+                      "bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-300"
+                    );
                   }
                   return "bg-indigo-100 text-indigo-800 dark:bg-indigo-900/30 dark:text-indigo-300";
                 };
@@ -473,7 +529,9 @@ export default function Dashboard() {
                         {date.toLocaleDateString("ko-KR")}
                       </p>
                     </div>
-                    <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${getTagStyle()}`}>
+                    <span
+                      className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${getTagStyle()}`}
+                    >
                       {item.label ?? "일정"}
                     </span>
                   </div>
@@ -540,7 +598,10 @@ export default function Dashboard() {
                     // 여러 권일 때
                     <div className="flex justify-center gap-3 overflow-x-auto pb-2">
                       {monthlyBooks.slice(0, 3).map((book) => (
-                        <div key={book.id} className="flex-shrink-0 text-center w-24">
+                        <div
+                          key={book.id}
+                          className="flex-shrink-0 text-center w-24"
+                        >
                           <img
                             src={book.coverUrl || ""}
                             alt={book.title}
@@ -596,15 +657,15 @@ export default function Dashboard() {
             <div className="flex-1 flex flex-col justify-center">
               {upcomingEvent ? (
                 <div className="space-y-3">
-                    <div className="bg-green-50 dark:bg-green-900/20 rounded-lg p-4">
-                      <div className="flex items-start space-x-3">
-                        <div className="flex-shrink-0">
-                          <div className="w-12 h-12 bg-green-600 text-white rounded-lg flex items-center justify-center font-bold">
-                            {upcomingEvent.date
-                              ? new Date(upcomingEvent.date).getDate()
-                              : "-"}
-                          </div>
+                  <div className="bg-green-50 dark:bg-green-900/20 rounded-lg p-4">
+                    <div className="flex items-start space-x-3">
+                      <div className="flex-shrink-0">
+                        <div className="w-12 h-12 bg-green-600 text-white rounded-lg flex items-center justify-center font-bold">
+                          {upcomingEvent.date
+                            ? new Date(upcomingEvent.date).getDate()
+                            : "-"}
                         </div>
+                      </div>
                       <div className="flex-1 min-w-0">
                         <h3 className="font-semibold text-gray-900 dark:text-white">
                           {upcomingEvent.title}
@@ -637,19 +698,19 @@ export default function Dashboard() {
           <section className="bg-white dark:bg-gray-800 rounded-lg shadow-md p-6 hover:shadow-lg transition-shadow min-h-[280px] flex flex-col">
             <div className="flex items-center justify-between mb-4">
               <div className="flex items-center">
-              <svg
-                className="w-8 h-8 text-purple-600"
-                fill="none"
-                stroke="currentColor"
-                viewBox="0 0 24 24"
-              >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth={2}
-                  d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4"
-                />
-              </svg>
+                <svg
+                  className="w-8 h-8 text-purple-600"
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4"
+                  />
+                </svg>
                 <h2 className="text-lg font-bold text-gray-900 dark:text-white ml-3">
                   디깅박스
                 </h2>

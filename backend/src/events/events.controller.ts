@@ -102,11 +102,16 @@ export class EventsController {
   }
 
   // 관리자: 신청 승인
+  // finalizeApproval=true 시 미승인 신청자에게 거절 DM 전송
   @Post(':id/approve')
   approveApplications(
     @Param('id') eventId: string,
-    @Body() body: { applicationIds: string[] },
+    @Body() body: { applicationIds: string[]; finalizeApproval?: boolean },
   ) {
-    return this.eventsService.approveApplications(eventId, body.applicationIds);
+    return this.eventsService.approveApplications(
+      eventId,
+      body.applicationIds,
+      body.finalizeApproval ?? false,
+    );
   }
 }
