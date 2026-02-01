@@ -144,7 +144,7 @@ services:
   # ==================
   # Prisma Studio (DB 관리 UI)
   # ==================
-  prisma-studio:
+  studio:
     build:
       context: ./backend
       dockerfile: Dockerfile.studio
