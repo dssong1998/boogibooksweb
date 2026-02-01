@@ -12,7 +12,10 @@ function getAuthHeaders(): Record<string, string> {
 function handleTokenExpired() {
   localStorage.removeItem("auth_token");
   // 현재 페이지가 로그인 페이지가 아니면 리다이렉트
-  if (typeof window !== "undefined" && !window.location.pathname.startsWith("/auth")) {
+  if (
+    typeof window !== "undefined" &&
+    !window.location.pathname.startsWith("/auth")
+  ) {
     window.location.href = "/";
   }
 }
@@ -165,6 +168,8 @@ export interface EventEligibility {
   price: number;
   eventType: string;
   isTerras: boolean;
+  isNewMember: boolean;
+  isVisitor: boolean;
   isFree: boolean;
   libraryMessageCount: number;
   alreadyApplied: boolean;
@@ -186,24 +191,34 @@ export function checkEventEligibility(eventId: string) {
 }
 
 export function applyToEvent(eventId: string, useCoins: boolean = false) {
-  return fetchAPI<EventApplicationResult>(`/events/${eventId}/apply`, "POST", { useCoins });
+  return fetchAPI<EventApplicationResult>(`/events/${eventId}/apply`, "POST", {
+    useCoins,
+  });
 }
 
 export function confirmEventPayment(eventId: string, userId?: string) {
   return fetchAPI<{ success: boolean; message: string }>(
-    `/events/${eventId}/confirm-payment`, 
+    `/events/${eventId}/confirm-payment`,
     "POST",
-    userId ? { userId } : undefined
+    userId ? { userId } : undefined,
   );
 }
 
 // 사용자 정보 조회 (공개 API - 토큰 불필요)
 export function getUserById(userId: string) {
-  return fetchAPI<{ id: string; username: string; discordId: string; isTerras: boolean }>(`/users/${userId}`);
+  return fetchAPI<{
+    id: string;
+    username: string;
+    discordId: string;
+    isTerras: boolean;
+  }>(`/users/${userId}`);
 }
 
 export function cancelEventApplication(eventId: string) {
-  return fetchAPI<{ success: boolean; message: string; refundedCoins: number }>(`/events/${eventId}/cancel`, "DELETE");
+  return fetchAPI<{ success: boolean; message: string; refundedCoins: number }>(
+    `/events/${eventId}/cancel`,
+    "DELETE",
+  );
 }
 
 export function searchBooks(query: string) {
@@ -327,7 +342,12 @@ export interface EventApplicationData {
   eventId: string;
   userId: string;
   applicationOrder: number;
-  status: "PENDING" | "APPROVED" | "CONFIRMED" | "COIN_GUARANTEED" | "CANCELLED";
+  status:
+    | "PENDING"
+    | "APPROVED"
+    | "CONFIRMED"
+    | "COIN_GUARANTEED"
+    | "CANCELLED";
   usedCoins: number;
   libraryMessageCount: number;
   paidAt?: string | null;
@@ -341,7 +361,10 @@ export function getEventApplications(eventId: string) {
   return fetchAPI<EventApplicationData[]>(`/events/${eventId}/applications`);
 }
 
-export function approveEventApplications(eventId: string, applicationIds: string[]) {
+export function approveEventApplications(
+  eventId: string,
+  applicationIds: string[],
+) {
   return fetchAPI<{
     approved: number;
     coinRefunded: { userId: string; coins: number; discordId: string }[];
@@ -404,7 +427,10 @@ export function getMonthSchedules(year: number, month: number) {
   return fetchAPI<ScheduleData[]>(`/admin/schedule/month/${year}/${month}`);
 }
 
-export function updateAdminSchedule(id: string, payload: Partial<ScheduleData>) {
+export function updateAdminSchedule(
+  id: string,
+  payload: Partial<ScheduleData>,
+) {
   return fetchAPI<ScheduleData>(`/admin/schedule/${id}`, "PATCH", payload);
 }
 
@@ -414,10 +440,10 @@ export function deleteAdminSchedule(id: string) {
 
 // TableLog (식탁 방명록) 관련
 export interface TableLogStats {
-  totalDays: number;      // 총 참여 일수
-  totalLogs: number;      // 총 로그 수
+  totalDays: number; // 총 참여 일수
+  totalLogs: number; // 총 로그 수
   monthlyStats: {
-    month: string;        // "2026-01" 형식
+    month: string; // "2026-01" 형식
     count: number;
   }[];
 }
@@ -456,7 +482,9 @@ export function getTableLogMonthly(year?: number, month?: number) {
 
 // 식탁 리더보드
 export function getTableLogLeaderboard(limit: number = 10) {
-  return fetchAPI<TableLogLeaderboard[]>(`/table-logs/leaderboard?limit=${limit}`);
+  return fetchAPI<TableLogLeaderboard[]>(
+    `/table-logs/leaderboard?limit=${limit}`,
+  );
 }
 
 // 월간 식탁 리더보드 (이용시간 + 방문횟수)
@@ -481,7 +509,9 @@ export function getMonthlyLeaderboard(year?: number, month?: number) {
   if (year) params.append("year", String(year));
   if (month) params.append("month", String(month));
   const query = params.toString() ? `?${params.toString()}` : "";
-  return fetchAPI<MonthlyLeaderboard>(`/table-logs/monthly-leaderboard${query}`);
+  return fetchAPI<MonthlyLeaderboard>(
+    `/table-logs/monthly-leaderboard${query}`,
+  );
 }
 
 // 디깅 공개 목록 (페이지네이션)
@@ -511,27 +541,32 @@ export function getPublicDiggings(page = 1, limit = 20, hashtag?: string) {
   params.append("page", String(page));
   params.append("limit", String(limit));
   if (hashtag) params.append("hashtag", hashtag);
-  return fetchAPI<DiggingPublicResponse>(`/digging/public?${params.toString()}`);
+  return fetchAPI<DiggingPublicResponse>(
+    `/digging/public?${params.toString()}`,
+  );
 }
 
 // 날짜+시간 포맷 유틸리티 (한국 시간대)
-export function formatDateTime(date: string | Date, includeTime = true): string {
-  const d = typeof date === 'string' ? new Date(date) : date;
-  
+export function formatDateTime(
+  date: string | Date,
+  includeTime = true,
+): string {
+  const d = typeof date === "string" ? new Date(date) : date;
+
   const options: Intl.DateTimeFormatOptions = {
-    timeZone: 'Asia/Seoul',
-    year: 'numeric',
-    month: 'long',
-    day: 'numeric',
-    weekday: 'short',
+    timeZone: "Asia/Seoul",
+    year: "numeric",
+    month: "long",
+    day: "numeric",
+    weekday: "short",
   };
-  
+
   if (includeTime) {
-    options.hour = '2-digit';
-    options.minute = '2-digit';
+    options.hour = "2-digit";
+    options.minute = "2-digit";
   }
-  
-  return d.toLocaleString('ko-KR', options);
+
+  return d.toLocaleString("ko-KR", options);
 }
 
 // 날짜만 포맷 (시간 제외)

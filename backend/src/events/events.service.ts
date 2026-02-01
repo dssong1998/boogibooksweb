@@ -225,6 +225,7 @@ export class EventsService {
     eventType: string;
     isTerras: boolean;
     isNewMember: boolean;
+    isVisitor: boolean;
     isFree: boolean;
     libraryMessageCount: number;
     alreadyApplied: boolean;
@@ -241,6 +242,7 @@ export class EventsService {
     if (!event) throw new BadRequestException('이벤트를 찾을 수 없습니다.');
 
     /* eslint-disable @typescript-eslint/no-unsafe-member-access */
+    const userRole = user.role as string;
     const isTerras = user.isTerras as boolean;
     const isNewMember = user.isNewMember as boolean;
     const eventPrice = event.price as number;
@@ -252,6 +254,9 @@ export class EventsService {
     // applications 배열 길이로 현재 참가자 수 계산
     const currentParticipants = (event.applications?.length ?? 0) as number;
     /* eslint-enable @typescript-eslint/no-unsafe-member-access */
+
+    // VISITOR는 이벤트 신청 불가
+    const isVisitor = userRole === 'VISITOR';
 
     // 테라스 멤버 또는 뉴멤버는 무료
     const isFree = isTerras || isNewMember;
@@ -273,6 +278,27 @@ export class EventsService {
     const currentOrder = currentParticipants + 1;
     const isOverCapacity = currentOrder > maxParticipants;
 
+    // VISITOR는 이벤트 신청 불가
+    if (isVisitor) {
+      return {
+        eligible: false,
+        reason: '디스코드 서버 멤버만 이벤트에 신청할 수 있습니다.',
+        currentOrder,
+        maxParticipants,
+        isOverCapacity,
+        requiredCoins,
+        userCoins,
+        price: eventPrice,
+        eventType,
+        isTerras,
+        isNewMember,
+        isVisitor,
+        isFree,
+        libraryMessageCount: 0,
+        alreadyApplied: false,
+      };
+    }
+
     if (existingApplication) {
       /* eslint-disable @typescript-eslint/no-unsafe-member-access */
       const existingOrder = existingApplication.applicationOrder as number;
@@ -290,6 +316,7 @@ export class EventsService {
         eventType,
         isTerras,
         isNewMember,
+        isVisitor,
         isFree,
         libraryMessageCount: libraryActivity.messageCount,
         alreadyApplied: true,
@@ -312,6 +339,7 @@ export class EventsService {
         eventType,
         isTerras,
         isNewMember,
+        isVisitor,
         isFree,
         libraryMessageCount: libraryActivity.messageCount,
         alreadyApplied: false,
@@ -329,6 +357,7 @@ export class EventsService {
       eventType,
       isTerras,
       isNewMember,
+      isVisitor,
       isFree,
       libraryMessageCount: libraryActivity.messageCount,
       alreadyApplied: false,
@@ -363,6 +392,7 @@ export class EventsService {
     if (!event) throw new BadRequestException('이벤트를 찾을 수 없습니다.');
 
     /* eslint-disable @typescript-eslint/no-unsafe-member-access */
+    const userRole = user.role as string;
     const isTerras = user.isTerras as boolean;
     const isNewMember = user.isNewMember as boolean;
     const discordId = user.discordId as string;
@@ -372,6 +402,13 @@ export class EventsService {
     // applications 배열 길이로 현재 참가자 수 계산
     const currentParticipants = (event.applications?.length ?? 0) as number;
     /* eslint-enable @typescript-eslint/no-unsafe-member-access */
+
+    // VISITOR는 이벤트 신청 불가
+    if (userRole === 'VISITOR') {
+      throw new ForbiddenException(
+        '디스코드 서버 멤버만 이벤트에 신청할 수 있습니다.',
+      );
+    }
 
     // 이미 신청했는지 확인
     /* eslint-disable @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access */

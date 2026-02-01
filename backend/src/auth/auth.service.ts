@@ -290,11 +290,12 @@ export class AuthService {
       where: { userId },
     });
 
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-return
+    /* eslint-disable @typescript-eslint/no-unsafe-return, @typescript-eslint/no-unsafe-assignment */
     return {
       ...user,
       totalBooksRead: booksCount,
       diggingsCount,
     };
+    /* eslint-enable @typescript-eslint/no-unsafe-return, @typescript-eslint/no-unsafe-assignment */
   }
 }

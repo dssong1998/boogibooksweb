@@ -1,0 +1,19 @@
+# ====================================
+# Prisma Studio Dockerfile
+# ====================================
+FROM node:20-alpine
+
+WORKDIR /app
+
+# 의존성 설치
+COPY package*.json ./
+RUN npm ci --omit=dev
+
+# Prisma 스키마 복사 및 클라이언트 생성
+COPY prisma ./prisma/
+RUN npx prisma generate
+
+EXPOSE 5555
+
+# Prisma Studio 실행
+CMD ["npx", "prisma", "studio", "--port", "5555", "--browser", "none"]

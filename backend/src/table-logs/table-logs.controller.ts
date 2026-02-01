@@ -38,7 +38,7 @@ export class TableLogsController {
   @Post()
   async createTableLog(@Body() dto: CreateTableLogDto) {
     const now = new Date();
-    
+
     // channelName에 type과 추가 정보 저장
     // 형식: "VOICE_JOIN:식탁:username" 또는 "VOICE_LEAVE:식탁:username:30분"
     let channelInfo = `${dto.type}:${dto.channelName}`;
@@ -59,7 +59,9 @@ export class TableLogsController {
       },
     });
 
-    console.log(`📝 TableLog 생성: ${dto.username || dto.discordUserId} - ${dto.type} - ${dto.channelName}`);
+    console.log(
+      `📝 TableLog 생성: ${dto.username || dto.discordUserId} - ${dto.type} - ${dto.channelName}`,
+    );
 
     // eslint-disable-next-line @typescript-eslint/no-unsafe-return
     return log;
@@ -79,19 +81,19 @@ export class TableLogsController {
     }
 
     // 총 참여 일수 (중복 날짜 제외)
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access
-    const logs = await (this.prisma as any).tableLog.findMany({
-      // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
-      where: { discordUserId: user.discordId },
-      orderBy: { date: 'desc' },
-    });
+    /* eslint-disable @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access */
+    const logs: { date: Date; discordUserId: string; channelName?: string }[] =
+      await (this.prisma as any).tableLog.findMany({
+        where: { discordUserId: user.discordId },
+        orderBy: { date: 'desc' },
+      });
+    /* eslint-enable @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access */
 
     // 고유 날짜 계산
     const uniqueDates = new Set<string>();
     const monthlyMap = new Map<string, number>();
 
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-call
-    logs.forEach((log: { date: Date }) => {
+    logs.forEach((log) => {
       const dateStr = log.date.toISOString().split('T')[0];
       uniqueDates.add(dateStr);
 
@@ -106,7 +108,6 @@ export class TableLogsController {
 
     return {
       totalDays: uniqueDates.size,
-      // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
       totalLogs: logs.length,
       monthlyStats,
     };
@@ -125,8 +126,10 @@ export class TableLogsController {
     const startDate = new Date(targetYear, targetMonth - 1, 1);
     const endDate = new Date(targetYear, targetMonth, 0, 23, 59, 59);
 
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access
-    const logs = await (this.prisma as any).tableLog.findMany({
+    /* eslint-disable @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access */
+    const logs: { discordUserId: string; date: Date }[] = await (
+      this.prisma as any
+    ).tableLog.findMany({
       where: {
         date: {
           gte: startDate,
@@ -134,29 +137,38 @@ export class TableLogsController {
         },
       },
     });
+    /* eslint-enable @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access */
 
     // 유저별 참여 횟수
     const userCountMap = new Map<string, number>();
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-call
-    logs.forEach((log: { discordUserId: string }) => {
-      userCountMap.set(log.discordUserId, (userCountMap.get(log.discordUserId) || 0) + 1);
+    logs.forEach((log) => {
+      userCountMap.set(
+        log.discordUserId,
+        (userCountMap.get(log.discordUserId) || 0) + 1,
+      );
     });
 
-    // 유저 정보 가져오기
+    // 유저 정보 가져오기 (관리자 제외)
     const discordIds = Array.from(userCountMap.keys());
     // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access
     const users = await (this.prisma as any).user.findMany({
-      where: { discordId: { in: discordIds } },
+      where: {
+        discordId: { in: discordIds },
+        role: { not: 'ADMIN' }, // 관리자 제외
+      },
       select: { discordId: true, username: true },
     });
 
     const userMap = new Map<string, string>();
+    const nonAdminDiscordIds = new Set<string>();
     // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-call
     users.forEach((u: { discordId: string; username: string }) => {
       userMap.set(u.discordId, u.username);
+      nonAdminDiscordIds.add(u.discordId);
     });
 
     const userStats = Array.from(userCountMap.entries())
+      .filter(([discordId]) => nonAdminDiscordIds.has(discordId))
       .map(([discordId, count]) => ({
         discordId,
         username: userMap.get(discordId) || `User_${discordId.slice(-4)}`,
@@ -167,9 +179,8 @@ export class TableLogsController {
     return {
       year: targetYear,
       month: targetMonth,
-      // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
       totalLogs: logs.length,
-      uniqueUsers: userCountMap.size,
+      uniqueUsers: nonAdminDiscordIds.size, // 관리자 제외한 유니크 사용자 수
       userStats,
     };
   }
@@ -190,24 +201,30 @@ export class TableLogsController {
         userDaysMap.set(log.discordUserId, new Set());
       }
       const dateStr = log.date.toISOString().split('T')[0];
-      userDaysMap.get(log.discordUserId)!.add(dateStr);
+      userDaysMap.get(log.discordUserId)?.add(dateStr);
     });
 
-    // 유저 정보 가져오기
+    // 유저 정보 가져오기 (관리자 제외)
     const discordIds = Array.from(userDaysMap.keys());
     // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access
     const users = await (this.prisma as any).user.findMany({
-      where: { discordId: { in: discordIds } },
+      where: {
+        discordId: { in: discordIds },
+        role: { not: 'ADMIN' }, // 관리자 제외
+      },
       select: { discordId: true, username: true },
     });
 
     const userMap = new Map<string, string>();
+    const nonAdminDiscordIds = new Set<string>();
     // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-call
     users.forEach((u: { discordId: string; username: string }) => {
       userMap.set(u.discordId, u.username);
+      nonAdminDiscordIds.add(u.discordId);
     });
 
     const leaderboard = Array.from(userDaysMap.entries())
+      .filter(([discordId]) => nonAdminDiscordIds.has(discordId))
       .map(([discordId, daysSet]) => ({
         discordId,
         username: userMap.get(discordId) || `User_${discordId.slice(-4)}`,
@@ -249,59 +266,73 @@ export class TableLogsController {
     >();
 
     // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-call
-    logs.forEach((log: { discordUserId: string; date: Date; channelName: string | null }) => {
-      if (!userStatsMap.has(log.discordUserId)) {
-        userStatsMap.set(log.discordUserId, {
-          totalMinutes: 0,
-          visitCount: 0,
-          dates: new Set(),
-        });
-      }
-      const stats = userStatsMap.get(log.discordUserId)!;
-
-      // channelName에서 duration 추출 (형식: "VOICE_LEAVE:식탁:username:30분")
-      if (log.channelName) {
-        const parts = log.channelName.split(':');
-        if (parts[0] === 'VOICE_LEAVE' && parts.length >= 4) {
-          const durationStr = parts[parts.length - 1];
-          const minutes = parseInt(durationStr.replace('분', ''));
-          if (!isNaN(minutes)) {
-            stats.totalMinutes += minutes;
-          }
+    logs.forEach(
+      (log: {
+        discordUserId: string;
+        date: Date;
+        channelName: string | null;
+      }) => {
+        let stats = userStatsMap.get(log.discordUserId);
+        if (!stats) {
+          stats = {
+            totalMinutes: 0,
+            visitCount: 0,
+            dates: new Set(),
+          };
+          userStatsMap.set(log.discordUserId, stats);
         }
-        // 방문 횟수는 JOIN 또는 모든 기록 카운트
-        if (parts[0] === 'VOICE_JOIN' || !parts[0].startsWith('VOICE_')) {
+
+        // channelName에서 duration 추출 (형식: "VOICE_LEAVE:식탁:username:30분")
+        if (log.channelName) {
+          const parts = log.channelName.split(':');
+          if (parts[0] === 'VOICE_LEAVE' && parts.length >= 4) {
+            const durationStr = parts[parts.length - 1];
+            const minutes = parseInt(durationStr.replace('분', ''));
+            if (!isNaN(minutes)) {
+              stats.totalMinutes += minutes;
+            }
+          }
+          // 방문 횟수는 JOIN 또는 모든 기록 카운트
+          if (parts[0] === 'VOICE_JOIN' || !parts[0].startsWith('VOICE_')) {
+            stats.visitCount += 1;
+          }
+        } else {
+          // 이전 형식의 로그 (channelName만 있음)
           stats.visitCount += 1;
         }
-      } else {
-        // 이전 형식의 로그 (channelName만 있음)
-        stats.visitCount += 1;
-      }
 
-      const dateStr = log.date.toISOString().split('T')[0];
-      stats.dates.add(dateStr);
-    });
+        const dateStr = log.date.toISOString().split('T')[0];
+        stats.dates.add(dateStr);
+      },
+    );
 
-    // 유저 정보 가져오기
+    // 유저 정보 가져오기 (관리자 제외)
     const discordIds = Array.from(userStatsMap.keys());
     // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access
     const users = await (this.prisma as any).user.findMany({
-      where: { discordId: { in: discordIds } },
+      where: {
+        discordId: { in: discordIds },
+        role: { not: 'ADMIN' }, // 관리자 제외
+      },
       select: { id: true, discordId: true, username: true },
     });
 
     const userMap = new Map<string, { id: string; username: string }>();
+    const nonAdminDiscordIds = new Set<string>();
     // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-call
     users.forEach((u: { id: string; discordId: string; username: string }) => {
       userMap.set(u.discordId, { id: u.id, username: u.username });
+      nonAdminDiscordIds.add(u.discordId);
     });
 
-    // 이용시간 기준 정렬
+    // 이용시간 기준 정렬 (관리자 제외)
     const timeLeaderboard = Array.from(userStatsMap.entries())
+      .filter(([discordId]) => nonAdminDiscordIds.has(discordId))
       .map(([discordId, stats]) => ({
         discordId,
         userId: userMap.get(discordId)?.id,
-        username: userMap.get(discordId)?.username || `User_${discordId.slice(-4)}`,
+        username:
+          userMap.get(discordId)?.username || `User_${discordId.slice(-4)}`,
         totalMinutes: stats.totalMinutes,
         visitCount: stats.visitCount,
         uniqueDays: stats.dates.size,
@@ -309,12 +340,14 @@ export class TableLogsController {
       .filter((u) => u.totalMinutes > 0)
       .sort((a, b) => b.totalMinutes - a.totalMinutes);
 
-    // 방문횟수 기준 정렬
+    // 방문횟수 기준 정렬 (관리자 제외)
     const visitLeaderboard = Array.from(userStatsMap.entries())
+      .filter(([discordId]) => nonAdminDiscordIds.has(discordId))
       .map(([discordId, stats]) => ({
         discordId,
         userId: userMap.get(discordId)?.id,
-        username: userMap.get(discordId)?.username || `User_${discordId.slice(-4)}`,
+        username:
+          userMap.get(discordId)?.username || `User_${discordId.slice(-4)}`,
         totalMinutes: stats.totalMinutes,
         visitCount: stats.visitCount,
         uniqueDays: stats.dates.size,
@@ -325,8 +358,9 @@ export class TableLogsController {
     return {
       year: targetYear,
       month: targetMonth,
-      timeLeaderboard: timeLeaderboard.slice(0, 10),
-      visitLeaderboard: visitLeaderboard.slice(0, 10),
+      // 전체 리더보드 반환 (내 순위 계산용)
+      timeLeaderboard,
+      visitLeaderboard,
     };
   }
 }
