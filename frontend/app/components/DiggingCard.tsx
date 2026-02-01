@@ -86,15 +86,15 @@ function YouTubeEmbed({
   if (isPlaying) {
     return (
       <div
-        className="relative w-full overflow-hidden rounded-lg bg-gray-100 dark:bg-gray-700"
+        className='relative w-full overflow-hidden rounded-lg bg-gray-100 dark:bg-gray-700'
         style={{ paddingBottom: '56.25%' }}
       >
         <iframe
-          className="absolute top-0 left-0 w-full h-full"
+          className='absolute top-0 left-0 w-full h-full'
           src={`https://www.youtube.com/embed/${videoId}?autoplay=1`}
           allowFullScreen
           title={title || 'YouTube video'}
-          allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+          allow='accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture'
         />
       </div>
     );
@@ -103,14 +103,14 @@ function YouTubeEmbed({
   return (
     <button
       onClick={() => setIsPlaying(true)}
-      className="relative w-full overflow-hidden rounded-lg bg-gray-100 dark:bg-gray-700 group cursor-pointer"
+      className='relative w-full overflow-hidden rounded-lg bg-gray-100 dark:bg-gray-700 group cursor-pointer'
       style={{ paddingBottom: '56.25%' }}
       aria-label={`Play ${title || 'YouTube video'}`}
     >
       <img
         src={thumbnailUrl}
         alt={title || 'YouTube video thumbnail'}
-        className="absolute top-0 left-0 w-full h-full object-cover"
+        className='absolute top-0 left-0 w-full h-full object-cover'
         onError={(e) => {
           // DB 썸네일이나 maxresdefault가 없으면 hqdefault로 fallback
           if (e.currentTarget.src !== fallbackThumbnailUrl) {
@@ -119,17 +119,17 @@ function YouTubeEmbed({
         }}
       />
       {/* Play 버튼 오버레이 - Sage Green */}
-      <div className="absolute inset-0 flex items-center justify-center bg-black/20 group-hover:bg-black/30 transition-colors">
+      <div className='absolute inset-0 flex items-center justify-center bg-black/20 group-hover:bg-black/30 transition-colors'>
         <div
-          className="w-16 h-16 rounded-full flex items-center justify-center shadow-lg group-hover:scale-110 transition-transform"
+          className='w-16 h-16 rounded-full flex items-center justify-center shadow-lg group-hover:scale-110 transition-transform'
           style={{ backgroundColor: '#9CAF88' }}
         >
           <svg
-            className="w-8 h-8 text-white ml-1"
-            fill="currentColor"
-            viewBox="0 0 24 24"
+            className='w-8 h-8 text-white ml-1'
+            fill='currentColor'
+            viewBox='0 0 24 24'
           >
-            <path d="M8 5v14l11-7z" />
+            <path d='M8 5v14l11-7z' />
           </svg>
         </div>
       </div>
@@ -154,16 +154,16 @@ function LinkPreview({
   return (
     <a
       href={url}
-      target="_blank"
-      rel="noopener noreferrer"
-      className="block border border-gray-200 dark:border-gray-600 rounded-lg overflow-hidden hover:border-purple-300 dark:hover:border-purple-500 transition-colors"
+      target='_blank'
+      rel='noopener noreferrer'
+      className='block border border-gray-200 dark:border-gray-600 rounded-lg overflow-hidden hover:border-purple-300 dark:hover:border-purple-500 transition-colors'
     >
       {thumbnail && (
-        <div className="relative w-full bg-gray-100 dark:bg-gray-700">
+        <div className='relative w-full bg-gray-100 dark:bg-gray-700'>
           <img
             src={thumbnail}
             alt={title || 'Link preview'}
-            className="w-full h-48 object-cover"
+            className='w-full h-48 object-cover'
             onError={(e) => {
               // 이미지 로딩 실패 시 숨김
               e.currentTarget.style.display = 'none';
@@ -171,12 +171,12 @@ function LinkPreview({
           />
         </div>
       )}
-      <div className="p-4 bg-gray-50 dark:bg-gray-700/50">
-        <div className="flex items-center gap-2 text-xs text-gray-500 dark:text-gray-400 mb-2">
+      <div className='p-4 bg-gray-50 dark:bg-gray-700/50'>
+        <div className='flex items-center gap-2 text-xs text-gray-500 dark:text-gray-400 mb-2'>
           <img
             src={`https://www.google.com/s2/favicons?domain=${domain}&sz=16`}
-            alt=""
-            className="w-4 h-4"
+            alt=''
+            className='w-4 h-4'
             onError={(e) => {
               e.currentTarget.style.display = 'none';
             }}
@@ -184,12 +184,12 @@ function LinkPreview({
           <span>{domain}</span>
         </div>
         {title && (
-          <h4 className="font-medium text-gray-900 dark:text-white line-clamp-2 mb-1">
+          <h4 className='font-medium text-gray-900 dark:text-white line-clamp-2 mb-1'>
             {title}
           </h4>
         )}
         {description && (
-          <p className="text-sm text-gray-600 dark:text-gray-300 line-clamp-2">
+          <p className='text-sm text-gray-600 dark:text-gray-300 line-clamp-2'>
             {description}
           </p>
         )}
@@ -213,14 +213,14 @@ export default function DiggingCard({
   const domain = extractDomain(url);
 
   return (
-    <article className="bg-white dark:bg-gray-800 rounded-xl shadow-md hover:shadow-lg transition-all duration-200 overflow-hidden">
-      <div className="p-6">
+    <article className='bg-white dark:bg-gray-800 rounded-xl shadow-md hover:shadow-lg transition-all duration-200 overflow-hidden'>
+      <div className='p-6'>
         {/* Header */}
-        <div className="flex items-start justify-between mb-3">
-          <div className="flex items-center space-x-2 text-sm text-gray-500 dark:text-gray-400">
+        <div className='flex items-start justify-between mb-3'>
+          <div className='flex items-center space-x-2 text-sm text-gray-500 dark:text-gray-400'>
             {showUser && username && (
               <>
-                <span className="font-medium text-purple-600 dark:text-purple-400">
+                <span className='font-medium text-purple-600 dark:text-purple-400'>
                   {username}
                 </span>
                 <span>·</span>
@@ -228,27 +228,27 @@ export default function DiggingCard({
             )}
             <span>{timeAgo(createdAt)}</span>
           </div>
-          <div className="flex items-center gap-2">
-            <span className="text-xs text-gray-400 dark:text-gray-500 bg-gray-100 dark:bg-gray-700 px-2 py-1 rounded">
+          <div className='flex items-center gap-2'>
+            <span className='text-xs text-gray-400 dark:text-gray-500 bg-gray-100 dark:bg-gray-700 px-2 py-1 rounded'>
               {domain}
             </span>
             {onDelete && (
               <button
                 onClick={() => onDelete(id)}
-                className="text-red-500 dark:text-red-400 hover:text-red-600 dark:hover:text-red-300 p-1"
-                title="삭제"
+                className='text-red-500 dark:text-red-400 hover:text-red-600 dark:hover:text-red-300 p-1'
+                title='삭제'
               >
                 <svg
-                  className="w-4 h-4"
-                  fill="none"
-                  stroke="currentColor"
-                  viewBox="0 0 24 24"
+                  className='w-4 h-4'
+                  fill='none'
+                  stroke='currentColor'
+                  viewBox='0 0 24 24'
                 >
                   <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
+                    strokeLinecap='round'
+                    strokeLinejoin='round'
                     strokeWidth={2}
-                    d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"
+                    d='M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16'
                   />
                 </svg>
               </button>
@@ -257,15 +257,15 @@ export default function DiggingCard({
         </div>
 
         {/* Title (제목이 YouTube가 아닐 때만 상단에 표시) */}
-        {!youtubeVideoId && title && (
-          <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-2">
+        {title && (
+          <h3 className='text-lg font-semibold text-gray-900 dark:text-white mb-2'>
             {title}
           </h3>
         )}
 
         {/* Description */}
         {description && (
-          <p className="text-gray-700 dark:text-gray-300 whitespace-pre-wrap mb-4">
+          <p className='text-gray-700 dark:text-gray-300 whitespace-pre-wrap mb-4'>
             {description}
           </p>
         )}
