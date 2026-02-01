@@ -763,19 +763,40 @@ export default function Dashboard() {
             <div className='flex-1 flex flex-col justify-between'>
               {recentDigging ? (
                 <div className='space-y-3'>
-                  <div className='bg-purple-50 dark:bg-purple-900/20 rounded-lg p-4'>
-                    <a
-                      href={recentDigging.url}
-                      target='_blank'
-                      rel='noopener noreferrer'
-                      className='text-sm font-medium text-purple-600 dark:text-purple-400 hover:underline line-clamp-1'
-                    >
-                      {recentDigging.url}
-                    </a>
-                    <p className='text-sm text-gray-600 dark:text-gray-400 mt-2 line-clamp-2'>
-                      {recentDigging.description}
-                    </p>
-                  </div>
+                  <a
+                    href={recentDigging.url}
+                    target='_blank'
+                    rel='noopener noreferrer'
+                    className='block bg-purple-50 dark:bg-purple-900/20 rounded-lg overflow-hidden hover:bg-purple-100 dark:hover:bg-purple-900/30 transition-colors'
+                  >
+                    {/* 썸네일 */}
+                    {recentDigging.thumbnail && (
+                      <div className='w-full h-28 overflow-hidden'>
+                        <img
+                          src={recentDigging.thumbnail}
+                          alt={recentDigging.title || '디깅 썸네일'}
+                          className='w-full h-full object-cover'
+                          onError={(e) => {
+                            e.currentTarget.style.display = 'none';
+                          }}
+                        />
+                      </div>
+                    )}
+                    <div className='p-3'>
+                      {/* 제목 */}
+                      {recentDigging.title && (
+                        <h3 className='text-sm font-semibold text-gray-900 dark:text-white line-clamp-1 mb-1'>
+                          {recentDigging.title}
+                        </h3>
+                      )}
+                      {/* 콘텐츠 */}
+                      {recentDigging.description && (
+                        <p className='text-xs text-gray-600 dark:text-gray-400 line-clamp-2'>
+                          {recentDigging.description}
+                        </p>
+                      )}
+                    </div>
+                  </a>
                   <button
                     onClick={() => setShowDiggingModal(true)}
                     className='w-full px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors text-sm font-medium'

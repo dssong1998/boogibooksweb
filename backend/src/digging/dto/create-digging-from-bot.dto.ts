@@ -1,7 +1,7 @@
 export class CreateDiggingFromBotDto {
   url: string;
   title?: string;
-  description: string;
-  hashtags?: string[];
+  description?: string;
+  thumbnail?: string;
   discordId?: string;
 }

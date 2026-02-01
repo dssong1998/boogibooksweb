@@ -113,7 +113,9 @@ export interface CommentData {
 export interface DiggingData {
   id: string;
   url: string;
+  title?: string | null;
   description?: string | null;
+  thumbnail?: string | null;
   createdAt: string;
 }
 
@@ -520,6 +522,7 @@ export interface DiggingPublic {
   url: string;
   title?: string;
   description: string;
+  thumbnail?: string | null;
   hashtags: string[];
   createdAt: string;
   user: { id: string; username: string };

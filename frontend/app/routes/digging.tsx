@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { useNavigate } from "react-router";
 import type { Route } from "./+types/digging";
 import { deleteDigging, getDiggings, type DiggingData } from "../lib/api";
+import DiggingCard from "../components/DiggingCard";
 
 export function meta({}: Route.MetaArgs) {
   return [
@@ -119,47 +120,17 @@ export default function Digging() {
           /* Digging List */
           <div className="space-y-4">
             {items.map((item) => (
-              <div
+              <DiggingCard
                 key={item.id}
-                className="bg-white dark:bg-gray-800 rounded-lg shadow-md p-6 hover:shadow-lg transition-shadow"
-              >
-                <div className="flex items-start justify-between">
-                  <div className="flex-1">
-                    <a
-                      href={item.url}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="text-lg font-semibold text-purple-600 dark:text-purple-400 hover:underline"
-                    >
-                      {item.url}
-                    </a>
-                    <p className="mt-2 text-gray-700 dark:text-gray-300">
-                      {item.description}
-                    </p>
-                    <p className="mt-2 text-sm text-gray-500 dark:text-gray-400">
-                      {new Date(item.createdAt).toLocaleDateString("ko-KR")}
-                    </p>
-                  </div>
-                  <button
-                    onClick={() => handleDelete(item.id)}
-                    className="ml-4 text-red-600 dark:text-red-400 hover:text-red-700 dark:hover:text-red-300"
-                  >
-                    <svg
-                      className="w-5 h-5"
-                      fill="none"
-                      stroke="currentColor"
-                      viewBox="0 0 24 24"
-                    >
-                      <path
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        strokeWidth={2}
-                        d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"
-                      />
-                    </svg>
-                  </button>
-                </div>
-              </div>
+                id={item.id}
+                url={item.url}
+                title={item.title}
+                description={item.description}
+                thumbnail={item.thumbnail}
+                createdAt={item.createdAt}
+                onDelete={handleDelete}
+                showUser={false}
+              />
             ))}
           </div>
         )}

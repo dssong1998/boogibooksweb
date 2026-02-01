@@ -46,7 +46,10 @@ export class SeedController {
       });
     } catch (error) {
       console.error('User seed error:', error);
-      throw new HttpException('User seed failed', HttpStatus.INTERNAL_SERVER_ERROR);
+      throw new HttpException(
+        'User seed failed',
+        HttpStatus.INTERNAL_SERVER_ERROR,
+      );
     }
   }
 
@@ -113,7 +116,10 @@ export class SeedController {
     } catch (error: any) {
       // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
       if (error.status === HttpStatus.CONFLICT) throw error;
-      throw new HttpException('Book seed failed', HttpStatus.INTERNAL_SERVER_ERROR);
+      throw new HttpException(
+        'Book seed failed',
+        HttpStatus.INTERNAL_SERVER_ERROR,
+      );
     }
   }
 
@@ -160,7 +166,10 @@ export class SeedController {
       });
     } catch (error) {
       console.error('Comment seed error:', error);
-      throw new HttpException('Comment seed failed', HttpStatus.INTERNAL_SERVER_ERROR);
+      throw new HttpException(
+        'Comment seed failed',
+        HttpStatus.INTERNAL_SERVER_ERROR,
+      );
     }
   }
 
@@ -172,8 +181,8 @@ export class SeedController {
       discordUserId: string;
       url: string;
       title?: string;
-      description: string;
-      hashtags?: string[];
+      description?: string;
+      thumbnail?: string;
       createdAt?: string;
     },
   ) {
@@ -216,15 +225,19 @@ export class SeedController {
           userId: user.id,
           url: data.url,
           title: data.title || null,
-          description: data.description,
-          hashtags: data.hashtags || [],
+          description: data.description || '',
+          thumbnail: data.thumbnail || null,
           createdAt: data.createdAt ? new Date(data.createdAt) : new Date(),
         },
       });
     } catch (error: unknown) {
+      console.error('❌ Digging seed error:', error);
       const httpError = error as { status?: number };
       if (httpError.status === HttpStatus.CONFLICT) throw error;
-      throw new HttpException('Digging seed failed', HttpStatus.INTERNAL_SERVER_ERROR);
+      throw new HttpException(
+        'Digging seed failed',
+        HttpStatus.INTERNAL_SERVER_ERROR,
+      );
     }
   }
 
@@ -284,7 +297,10 @@ export class SeedController {
     } catch (error: any) {
       // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
       if (error.status === HttpStatus.CONFLICT) throw error;
-      throw new HttpException('TableLog seed failed', HttpStatus.INTERNAL_SERVER_ERROR);
+      throw new HttpException(
+        'TableLog seed failed',
+        HttpStatus.INTERNAL_SERVER_ERROR,
+      );
     }
   }
 }

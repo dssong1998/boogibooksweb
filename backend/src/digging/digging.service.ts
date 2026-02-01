@@ -13,7 +13,6 @@ export class DiggingService {
     return await (this.prisma as any).digging.create({
       data: {
         ...createDiggingDto,
-        hashtags: createDiggingDto.hashtags || [],
         user: {
           connect: {
             id: userId,
@@ -24,16 +23,18 @@ export class DiggingService {
   }
 
   async createFromBot(createDiggingFromBotDto: CreateDiggingFromBotDto) {
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-return, @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access
     const { discordId, ...rest } = createDiggingFromBotDto;
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access
     const user = await (this.prisma as any).user.findUnique({
       where: { discordId },
     });
     if (!user) throw new BadRequestException('사용자를 찾을 수 없습니다.');
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-return, @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access
     return await (this.prisma as any).digging.create({
       data: {
         ...rest,
-        hashtags: rest.hashtags || [],
+        description: rest.description || '',
+        thumbnail: rest.thumbnail || null,
         user: {
           connect: {
             discordId: discordId,
@@ -59,11 +60,10 @@ export class DiggingService {
   async findAllPublic(page: number = 1, limit: number = 20, hashtag?: string) {
     const skip = (page - 1) * limit;
 
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
     const where = hashtag ? { hashtags: { has: hashtag } } : {};
 
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access
-    const [diggings, total] = await Promise.all([
+    /* eslint-disable @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access */
+    const [diggings, total]: [unknown[], number] = await Promise.all([
       (this.prisma as any).digging.findMany({
         where,
         orderBy: { createdAt: 'desc' },
@@ -75,18 +75,15 @@ export class DiggingService {
       }),
       (this.prisma as any).digging.count({ where }),
     ]);
+    /* eslint-enable @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access */
 
     return {
-      // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
       data: diggings,
       pagination: {
         page,
         limit,
-        // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
         total,
-        // eslint-disable-next-line @typescript-eslint/no-unsafe-argument
         totalPages: Math.ceil(total / limit),
-        // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
         hasMore: skip + diggings.length < total,
       },
     };
