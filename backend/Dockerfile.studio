@@ -16,4 +16,4 @@ RUN npx prisma generate
 EXPOSE 5555
 
 # Prisma Studio 실행
-CMD ["npx", "prisma", "studio", "--port", "5555", "--browser", "none"]
+CMD ["npx", "prisma", "studio", "--port", "5555", "--browser", "none", "--url", "postgresql://${POSTGRES_USER:-boogibooks}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-boogibooks}"]
