@@ -391,14 +391,12 @@ export default function Dashboard() {
                   이번 달 이용시간
                 </span>
                 <p className='text-gray-900 dark:text-white font-medium mt-1'>
-                  {monthlyLeaderboard
+                  {tableLogStats
                     ? (() => {
-                        const myEntry = monthlyLeaderboard.timeLeaderboard.find(
-                          (e) => e.userId === user.id,
-                        );
-                        if (myEntry) {
-                          const h = Math.floor(myEntry.totalMinutes / 60);
-                          const m = myEntry.totalMinutes % 60;
+                        if (tableLogStats.thisMonthMinutes > 0) {
+                          const minutes = tableLogStats.thisMonthMinutes;
+                          const h = Math.floor(minutes / 60);
+                          const m = minutes % 60;
                           return h > 0 ? `${h}시간 ${m}분` : `${m}분`;
                         }
                         return '0분';
@@ -611,11 +609,17 @@ export default function Dashboard() {
                     // 1권일 때
                     <div className='text-center'>
                       <div className='mb-3'>
-                        <img
-                          src={monthlyBooks[0].coverUrl || ''}
-                          alt={monthlyBooks[0].title}
-                          className='w-28 h-40 object-cover rounded-lg shadow-md mx-auto'
-                        />
+                        {monthlyBooks[0].coverUrl ? (
+                          <img
+                            src={monthlyBooks[0].coverUrl}
+                            alt={monthlyBooks[0].title}
+                            className='w-28 h-40 object-cover rounded-lg shadow-md mx-auto'
+                          />
+                        ) : (
+                          <div className='w-28 h-40 bg-gray-200 dark:bg-gray-700 rounded-lg shadow-md mx-auto flex items-center justify-center'>
+                            <span className='text-3xl'>📚</span>
+                          </div>
+                        )}
                       </div>
                       <h3 className='font-bold text-gray-900 dark:text-white text-sm'>
                         {monthlyBooks[0].title}
@@ -632,11 +636,17 @@ export default function Dashboard() {
                           key={book.id}
                           className='flex-shrink-0 text-center w-24'
                         >
-                          <img
-                            src={book.coverUrl || ''}
-                            alt={book.title}
-                            className='w-20 h-28 object-cover rounded-lg shadow-md mx-auto mb-2'
-                          />
+                          {book.coverUrl ? (
+                            <img
+                              src={book.coverUrl}
+                              alt={book.title}
+                              className='w-20 h-28 object-cover rounded-lg shadow-md mx-auto mb-2'
+                            />
+                          ) : (
+                            <div className='w-20 h-28 bg-gray-200 dark:bg-gray-700 rounded-lg shadow-md mx-auto mb-2 flex items-center justify-center'>
+                              <span className='text-2xl'>📚</span>
+                            </div>
+                          )}
                           <h3 className='font-bold text-gray-900 dark:text-white text-xs truncate'>
                             {book.title}
                           </h3>
@@ -889,11 +899,17 @@ export default function Dashboard() {
                   onClick={() => navigate(`/books/${book.id}`)}
                   className='group relative aspect-[2/3] rounded-lg overflow-hidden shadow-md hover:shadow-xl transition-shadow cursor-pointer'
                 >
-                  <img
-                    src={book.coverUrl || ''}
-                    alt={book.title}
-                    className='w-full h-full object-cover group-hover:scale-105 transition-transform duration-300'
-                  />
+                  {book.coverUrl ? (
+                    <img
+                      src={book.coverUrl}
+                      alt={book.title}
+                      className='w-full h-full object-cover group-hover:scale-105 transition-transform duration-300'
+                    />
+                  ) : (
+                    <div className='w-full h-full bg-gradient-to-br from-gray-200 to-gray-300 dark:from-gray-700 dark:to-gray-600 flex items-center justify-center'>
+                      <span className='text-4xl'>📚</span>
+                    </div>
+                  )}
                   <div className='absolute inset-0 bg-gradient-to-t from-black/70 to-transparent opacity-0 group-hover:opacity-100 transition-opacity'>
                     <div className='absolute bottom-0 left-0 right-0 p-3'>
                       <h4 className='text-white font-medium text-sm line-clamp-2'>

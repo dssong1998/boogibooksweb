@@ -169,11 +169,17 @@ export default function MonthlyBook() {
                   <div className="flex flex-col md:flex-row gap-8">
                     {/* Book Cover */}
                     <div className="flex-shrink-0">
-                      <img
-                        src={selectedBook.coverUrl || ""}
-                        alt={selectedBook.title}
-                        className="w-64 h-auto rounded-lg shadow-lg mx-auto md:mx-0"
-                      />
+                      {selectedBook.coverUrl ? (
+                        <img
+                          src={selectedBook.coverUrl}
+                          alt={selectedBook.title}
+                          className="w-64 h-auto rounded-lg shadow-lg mx-auto md:mx-0"
+                        />
+                      ) : (
+                        <div className="w-64 h-80 bg-gray-200 dark:bg-gray-700 rounded-lg shadow-lg mx-auto md:mx-0 flex items-center justify-center">
+                          <span className="text-6xl">📚</span>
+                        </div>
+                      )}
                     </div>
 
                     {/* Book Info */}
@@ -264,11 +270,17 @@ export default function MonthlyBook() {
                         selectedBook?.id === book.id ? "ring-2 ring-amber-500" : ""
                       }`}
                     >
-                      <img
-                        src={book.coverUrl || ""}
-                        alt={book.title}
-                        className="w-full h-40 object-cover rounded-lg mb-3"
-                      />
+                      {book.coverUrl ? (
+                        <img
+                          src={book.coverUrl}
+                          alt={book.title}
+                          className="w-full h-40 object-cover rounded-lg mb-3"
+                        />
+                      ) : (
+                        <div className="w-full h-40 bg-gray-200 dark:bg-gray-700 rounded-lg mb-3 flex items-center justify-center">
+                          <span className="text-4xl">📚</span>
+                        </div>
+                      )}
                       <h4 className="font-bold text-gray-900 dark:text-white text-sm truncate">
                         {book.title}
                       </h4>

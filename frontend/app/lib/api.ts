@@ -448,6 +448,7 @@ export interface TableLogStats {
     month: string; // "2026-01" 형식
     count: number;
   }[];
+  thisMonthMinutes: number; // 이번 달 이용시간 (분)
 }
 
 export interface TableLogMonthly {

@@ -187,11 +187,17 @@ export default function BookDetail() {
           {/* Book Info Sidebar */}
           <div className="lg:col-span-1">
             <div className="bg-white dark:bg-gray-800 rounded-lg shadow-md p-6 sticky top-8">
-              <img
-                src={book?.coverUrl || ""}
-                alt={book?.title || ""}
-                className="w-full rounded-lg shadow-lg mb-4"
-              />
+              {book?.coverUrl ? (
+                <img
+                  src={book.coverUrl}
+                  alt={book?.title || ""}
+                  className="w-full rounded-lg shadow-lg mb-4"
+                />
+              ) : (
+                <div className="w-full aspect-[2/3] bg-gray-200 dark:bg-gray-700 rounded-lg shadow-lg mb-4 flex items-center justify-center">
+                  <span className="text-6xl">📚</span>
+                </div>
+              )}
               <h2 className="text-lg font-bold text-gray-900 dark:text-white mb-1">
                 {book?.title || "제목 없음"}
               </h2>

@@ -77,21 +77,30 @@ export class TableLogsController {
     });
 
     if (!user) {
-      return { totalDays: 0, monthlyStats: [] };
+      return { totalDays: 0, monthlyStats: [], thisMonthMinutes: 0 };
     }
 
     // 총 참여 일수 (중복 날짜 제외)
     /* eslint-disable @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access */
-    const logs: { date: Date; discordUserId: string; channelName?: string }[] =
-      await (this.prisma as any).tableLog.findMany({
-        where: { discordUserId: user.discordId },
-        orderBy: { date: 'desc' },
-      });
+    const logs: {
+      date: Date;
+      discordUserId: string;
+      channelName?: string | null;
+    }[] = await (this.prisma as any).tableLog.findMany({
+      where: { discordUserId: user.discordId },
+      orderBy: { date: 'desc' },
+    });
     /* eslint-enable @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access */
 
     // 고유 날짜 계산
     const uniqueDates = new Set<string>();
     const monthlyMap = new Map<string, number>();
+
+    // 이번 달 이용시간 계산
+    const now = new Date();
+    const thisYear = now.getFullYear();
+    const thisMonth = now.getMonth();
+    let thisMonthMinutes = 0;
 
     logs.forEach((log) => {
       const dateStr = log.date.toISOString().split('T')[0];
@@ -99,6 +108,22 @@ export class TableLogsController {
 
       const monthKey = `${log.date.getFullYear()}-${String(log.date.getMonth() + 1).padStart(2, '0')}`;
       monthlyMap.set(monthKey, (monthlyMap.get(monthKey) || 0) + 1);
+
+      // 이번 달 이용시간 추출 (VOICE_LEAVE 로그에서)
+      if (
+        log.date.getFullYear() === thisYear &&
+        log.date.getMonth() === thisMonth &&
+        log.channelName
+      ) {
+        const parts = log.channelName.split(':');
+        if (parts[0] === 'VOICE_LEAVE' && parts.length >= 4) {
+          const durationStr = parts[parts.length - 1];
+          const minutes = parseInt(durationStr.replace('분', ''));
+          if (!isNaN(minutes)) {
+            thisMonthMinutes += minutes;
+          }
+        }
+      }
     });
 
     // 월별 통계 정렬
@@ -110,6 +135,7 @@ export class TableLogsController {
       totalDays: uniqueDates.size,
       totalLogs: logs.length,
       monthlyStats,
+      thisMonthMinutes,
     };
   }
 
