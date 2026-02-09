@@ -31,6 +31,7 @@ enum EventType {
   MEETING      // 대면모임 (30,000원)
   DIGGING_CLUB // 디깅클럽 (15,000원)
   ONLINE       // 온라인 (무료 또는 별도)
+  BOOGITOUT    // 부깃아웃
   OTHER        // 기타
 }
 

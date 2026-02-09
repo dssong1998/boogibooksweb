@@ -216,17 +216,8 @@ export class EventsService {
   ): Promise<{
     eligible: boolean;
     reason?: string;
-    currentOrder: number;
-    maxParticipants: number;
-    isOverCapacity: boolean;
-    requiredCoins: number;
-    userCoins: number;
-    price: number;
-    eventType: string;
-    isTerras: boolean;
-    isNewMember: boolean;
-    isVisitor: boolean;
     isFree: boolean;
+    isOverCapacity: boolean;
     libraryMessageCount: number;
     alreadyApplied: boolean;
     existingStatus?: string;
@@ -245,11 +236,7 @@ export class EventsService {
     const userRole = user.role as string;
     const isTerras = user.isTerras as boolean;
     const isNewMember = user.isNewMember as boolean;
-    const eventPrice = event.price as number;
-    const eventType = event.eventType as string;
     const maxParticipants = event.maxParticipants as number;
-    const requiredCoins = event.requiredCoins as number;
-    const userCoins = user.coins as number;
     const discordId = user.discordId as string;
     // applications 배열 길이로 현재 참가자 수 계산
     const currentParticipants = (event.applications?.length ?? 0) as number;
@@ -271,9 +258,11 @@ export class EventsService {
     /* eslint-enable @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access */
 
     // 서재 활동 확인 (뉴멤버는 스킵)
-    const libraryActivity = isNewMember
-      ? { hasActivity: true, messageCount: 0 }
-      : await this.checkLibraryActivity(discordId);
+    const libraryActivity =
+      // eslint-disable-next-line
+      isNewMember || event?.eventType !== 'MEETING'
+        ? { hasActivity: true, messageCount: 0 }
+        : await this.checkLibraryActivity(discordId);
 
     const currentOrder = currentParticipants + 1;
     const isOverCapacity = currentOrder > maxParticipants;
@@ -283,17 +272,8 @@ export class EventsService {
       return {
         eligible: false,
         reason: '디스코드 서버 멤버만 이벤트에 신청할 수 있습니다.',
-        currentOrder,
-        maxParticipants,
-        isOverCapacity,
-        requiredCoins,
-        userCoins,
-        price: eventPrice,
-        eventType,
-        isTerras,
-        isNewMember,
-        isVisitor,
         isFree,
+        isOverCapacity: false,
         libraryMessageCount: 0,
         alreadyApplied: false,
       };
@@ -301,23 +281,13 @@ export class EventsService {
 
     if (existingApplication) {
       /* eslint-disable @typescript-eslint/no-unsafe-member-access */
-      const existingOrder = existingApplication.applicationOrder as number;
       const existingStatus = existingApplication.status as string;
       /* eslint-enable @typescript-eslint/no-unsafe-member-access */
       return {
         eligible: false,
         reason: '이미 이 이벤트에 신청하셨습니다.',
-        currentOrder: existingOrder,
-        maxParticipants,
-        isOverCapacity,
-        requiredCoins,
-        userCoins,
-        price: eventPrice,
-        eventType,
-        isTerras,
-        isNewMember,
-        isVisitor,
         isFree,
+        isOverCapacity,
         libraryMessageCount: libraryActivity.messageCount,
         alreadyApplied: true,
         existingStatus,
@@ -325,22 +295,18 @@ export class EventsService {
     }
 
     // 뉴멤버가 아닌 경우에만 서재 활동 체크
-    if (!isNewMember && !libraryActivity.hasActivity) {
+    if (
+      !isNewMember &&
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
+      event?.eventType === 'MEETING' &&
+      !libraryActivity.hasActivity
+    ) {
       return {
         eligible: false,
         reason:
           '이번 달 서재 채널에 유효한 글을 1개 이상 작성해야 신청할 수 있습니다.',
-        currentOrder,
-        maxParticipants,
-        isOverCapacity,
-        requiredCoins,
-        userCoins,
-        price: eventPrice,
-        eventType,
-        isTerras,
-        isNewMember,
-        isVisitor,
         isFree,
+        isOverCapacity,
         libraryMessageCount: libraryActivity.messageCount,
         alreadyApplied: false,
       };
@@ -348,16 +314,7 @@ export class EventsService {
 
     return {
       eligible: true,
-      currentOrder,
-      maxParticipants,
       isOverCapacity,
-      requiredCoins,
-      userCoins,
-      price: eventPrice,
-      eventType,
-      isTerras,
-      isNewMember,
-      isVisitor,
       isFree,
       libraryMessageCount: libraryActivity.messageCount,
       alreadyApplied: false,
@@ -423,14 +380,17 @@ export class EventsService {
     }
 
     // 서재 활동 확인 (뉴멤버는 스킵)
-    const libraryActivity = isNewMember
-      ? { hasActivity: true, messageCount: 0 }
-      : await this.checkLibraryActivity(discordId);
-
-    if (!isNewMember && !libraryActivity.hasActivity) {
-      throw new ForbiddenException(
-        '이번 달 서재 채널에 유효한 글을 1개 이상 작성해야 신청할 수 있습니다.',
-      );
+    let libraryActivity = { hasActivity: true, messageCount: 0 };
+    /* eslint-disable-next-line @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access */
+    if (event.eventType === 'MEETING') {
+      libraryActivity = isNewMember
+        ? { hasActivity: true, messageCount: 0 }
+        : await this.checkLibraryActivity(discordId);
+      if (!isNewMember && !libraryActivity.hasActivity) {
+        throw new ForbiddenException(
+          '이번 달 서재 채널에 유효한 글을 1개 이상 작성해야 신청할 수 있습니다.',
+        );
+      }
     }
 
     const applicationOrder = currentParticipants + 1;
@@ -440,7 +400,8 @@ export class EventsService {
     let status = 'PENDING'; // 기본: 관리자 승인 대기
 
     // 뉴멤버: 바로 CONFIRMED (승인 없이 확정)
-    if (isNewMember) {
+    // eslint-disable-next-line
+    if (isNewMember || event.eventType !== 'MEETING') {
       status = 'CONFIRMED';
     }
     // 코인 사용: COIN_GUARANTEED (정원 외 보장)
