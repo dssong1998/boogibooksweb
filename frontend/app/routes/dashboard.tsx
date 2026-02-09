@@ -170,8 +170,12 @@ export default function Dashboard() {
   };
 
   const upcomingEvent = useMemo(() => {
+    const now = new Date();
     const datedEvents = events
-      .filter((event) => event.date)
+      .filter((event) => {
+        const eventDate = new Date(event.date as string);
+        return eventDate >= now;
+      })
       .sort(
         (a, b) =>
           new Date(a.date || 0).getTime() - new Date(b.date || 0).getTime(),

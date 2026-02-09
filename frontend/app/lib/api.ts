@@ -1,28 +1,28 @@
 const API_BASE_URL =
-  import.meta.env.VITE_API_BASE_URL || "http://localhost:3000";
+  import.meta.env.VITE_API_BASE_URL || 'http://localhost:3000';
 
-type HttpMethod = "GET" | "POST" | "PATCH" | "DELETE";
+type HttpMethod = 'GET' | 'POST' | 'PATCH' | 'DELETE';
 
 function getAuthHeaders(): Record<string, string> {
-  const token = localStorage.getItem("auth_token");
+  const token = localStorage.getItem('auth_token');
   return token ? { Authorization: `Bearer ${token}` } : {};
 }
 
 // 토큰 만료 시 로그아웃 처리
 function handleTokenExpired() {
-  localStorage.removeItem("auth_token");
+  localStorage.removeItem('auth_token');
   // 현재 페이지가 로그인 페이지가 아니면 리다이렉트
   if (
-    typeof window !== "undefined" &&
-    !window.location.pathname.startsWith("/auth")
+    typeof window !== 'undefined' &&
+    !window.location.pathname.startsWith('/auth')
   ) {
-    window.location.href = "/";
+    window.location.href = '/';
   }
 }
 
 async function fetchAPI<T>(
   endpoint: string,
-  method: HttpMethod = "GET",
+  method: HttpMethod = 'GET',
   body?: unknown,
   headers?: Record<string, string>,
 ): Promise<T> {
@@ -31,7 +31,7 @@ async function fetchAPI<T>(
   const response = await fetch(url, {
     method,
     headers: {
-      ...(body ? { "Content-Type": "application/json" } : {}),
+      ...(body ? { 'Content-Type': 'application/json' } : {}),
       ...getAuthHeaders(),
       ...headers,
     },
@@ -41,7 +41,7 @@ async function fetchAPI<T>(
   // 401 Unauthorized = 토큰 만료 또는 무효
   if (response.status === 401) {
     handleTokenExpired();
-    throw new Error("Token expired");
+    throw new Error('Token expired');
   }
 
   if (!response.ok) {
@@ -54,14 +54,14 @@ async function fetchAPI<T>(
 
   // 빈 응답 처리
   const text = await response.text();
-  if (!text || text.trim() === "") {
+  if (!text || text.trim() === '') {
     return undefined as T;
   }
 
   return JSON.parse(text) as T;
 }
 
-export type EventType = "MEETING" | "DIGGING_CLUB" | "ONLINE" | "OTHER";
+export type EventType = 'MEETING' | 'DIGGING_CLUB' | 'ONLINE' | 'OTHER';
 
 export interface UserData {
   id: string;
@@ -98,7 +98,7 @@ export interface BookData {
   description?: string | null;
 }
 
-export type CommentType = "PREVIEW" | "REVIEW" | "QUOTE";
+export type CommentType = 'PREVIEW' | 'REVIEW' | 'QUOTE';
 
 export interface CommentData {
   id: string;
@@ -129,11 +129,17 @@ export interface NaverBookItem {
 }
 
 export function getMe() {
-  return fetchAPI<UserData>("/auth/me");
+  return fetchAPI<UserData>('/auth/me');
 }
 
-export function getEvents() {
-  return fetchAPI<EventData[]>("/events");
+export async function getEvents() {
+  const events = await fetchAPI<EventData[]>('/events');
+  const currentDate = new Date();
+  const futureEvents = events.filter((event) => {
+    const eventDate = new Date(event.date as string);
+    return eventDate > currentDate;
+  });
+  return futureEvents;
 }
 
 export function getEvent(id: string) {
@@ -147,15 +153,15 @@ export function createEvent(payload: {
   location?: string;
   capacity?: number;
 }) {
-  return fetchAPI<EventData>("/events", "POST", payload);
+  return fetchAPI<EventData>('/events', 'POST', payload);
 }
 
 export function updateEvent(id: string, payload: Partial<EventData>) {
-  return fetchAPI<EventData>(`/events/${id}`, "PATCH", payload);
+  return fetchAPI<EventData>(`/events/${id}`, 'PATCH', payload);
 }
 
 export function deleteEvent(id: string) {
-  return fetchAPI<void>(`/events/${id}`, "DELETE");
+  return fetchAPI<void>(`/events/${id}`, 'DELETE');
 }
 
 // 이벤트 신청 관련 API
@@ -193,7 +199,7 @@ export function checkEventEligibility(eventId: string) {
 }
 
 export function applyToEvent(eventId: string, useCoins: boolean = false) {
-  return fetchAPI<EventApplicationResult>(`/events/${eventId}/apply`, "POST", {
+  return fetchAPI<EventApplicationResult>(`/events/${eventId}/apply`, 'POST', {
     useCoins,
   });
 }
@@ -201,7 +207,7 @@ export function applyToEvent(eventId: string, useCoins: boolean = false) {
 export function confirmEventPayment(eventId: string, userId?: string) {
   return fetchAPI<{ success: boolean; message: string }>(
     `/events/${eventId}/confirm-payment`,
-    "POST",
+    'POST',
     userId ? { userId } : undefined,
   );
 }
@@ -219,7 +225,7 @@ export function getUserById(userId: string) {
 export function cancelEventApplication(eventId: string) {
   return fetchAPI<{ success: boolean; message: string; refundedCoins: number }>(
     `/events/${eventId}/cancel`,
-    "DELETE",
+    'DELETE',
   );
 }
 
@@ -230,7 +236,7 @@ export function searchBooks(query: string) {
 }
 
 export function getBooks() {
-  return fetchAPI<BookData[]>("/books");
+  return fetchAPI<BookData[]>('/books');
 }
 
 export function getBook(id: string) {
@@ -245,15 +251,15 @@ export function createBook(payload: {
   coverUrl?: string;
   description?: string;
 }) {
-  return fetchAPI<BookData>("/books", "POST", payload);
+  return fetchAPI<BookData>('/books', 'POST', payload);
 }
 
 export function updateBook(id: string, payload: Partial<BookData>) {
-  return fetchAPI<BookData>(`/books/${id}`, "PATCH", payload);
+  return fetchAPI<BookData>(`/books/${id}`, 'PATCH', payload);
 }
 
 export function deleteBook(id: string) {
-  return fetchAPI<void>(`/books/${id}`, "DELETE");
+  return fetchAPI<void>(`/books/${id}`, 'DELETE');
 }
 
 export function getCommentsByBook(bookId: string) {
@@ -266,19 +272,19 @@ export function createComment(payload: {
   content: string;
   page?: number;
 }) {
-  return fetchAPI<CommentData>("/comments", "POST", payload);
+  return fetchAPI<CommentData>('/comments', 'POST', payload);
 }
 
 export function getDiggings() {
-  return fetchAPI<DiggingData[]>("/digging");
+  return fetchAPI<DiggingData[]>('/digging');
 }
 
 export function createDigging(payload: { url: string; description?: string }) {
-  return fetchAPI<DiggingData>("/digging", "POST", payload);
+  return fetchAPI<DiggingData>('/digging', 'POST', payload);
 }
 
 export function deleteDigging(id: string) {
-  return fetchAPI<void>(`/digging/${id}`, "DELETE");
+  return fetchAPI<void>(`/digging/${id}`, 'DELETE');
 }
 
 export function processPayment(payload: {
@@ -286,7 +292,7 @@ export function processPayment(payload: {
   type?: string | null;
   coins: number;
 }) {
-  return fetchAPI<void>("/payments", "POST", payload);
+  return fetchAPI<void>('/payments', 'POST', payload);
 }
 
 // ========== Admin APIs ==========
@@ -311,7 +317,7 @@ export interface ScheduleData {
   description?: string | null;
   date: string;
   time?: string | null;
-  type: "MEETING" | "SHELLCAST" | "DIGGING_CLUB" | "MOVIE_NIGHT" | "BOOGITOUT";
+  type: 'MEETING' | 'SHELLCAST' | 'DIGGING_CLUB' | 'MOVIE_NIGHT' | 'BOOGITOUT';
 }
 
 // Admin: Events
@@ -323,19 +329,19 @@ export function createAdminEvent(payload: {
   maxParticipants: number;
   requiredCoins?: number;
 }) {
-  return fetchAPI<EventData>("/admin/events", "POST", payload);
+  return fetchAPI<EventData>('/admin/events', 'POST', payload);
 }
 
 export function getAdminEvents() {
-  return fetchAPI<EventData[]>("/admin/events");
+  return fetchAPI<EventData[]>('/admin/events');
 }
 
 export function updateAdminEvent(id: string, payload: Partial<EventData>) {
-  return fetchAPI<EventData>(`/admin/events/${id}`, "PATCH", payload);
+  return fetchAPI<EventData>(`/admin/events/${id}`, 'PATCH', payload);
 }
 
 export function deleteAdminEvent(id: string) {
-  return fetchAPI<void>(`/admin/events/${id}`, "DELETE");
+  return fetchAPI<void>(`/admin/events/${id}`, 'DELETE');
 }
 
 // Admin: Event Applications
@@ -345,11 +351,11 @@ export interface EventApplicationData {
   userId: string;
   applicationOrder: number;
   status:
-    | "PENDING"
-    | "APPROVED"
-    | "CONFIRMED"
-    | "COIN_GUARANTEED"
-    | "CANCELLED";
+    | 'PENDING'
+    | 'APPROVED'
+    | 'CONFIRMED'
+    | 'COIN_GUARANTEED'
+    | 'CANCELLED';
   usedCoins: number;
   libraryMessageCount: number;
   paidAt?: string | null;
@@ -371,7 +377,7 @@ export function approveEventApplications(
     approved: number;
     coinRefunded: { userId: string; coins: number; discordId: string }[];
     dmSent: number;
-  }>(`/events/${eventId}/approve`, "POST", { applicationIds });
+  }>(`/events/${eventId}/approve`, 'POST', { applicationIds });
 }
 
 // Admin: Monthly Book
@@ -387,15 +393,15 @@ export function createAdminMonthlyBook(payload: {
   description?: string;
   recommendation?: string;
 }) {
-  return fetchAPI<MonthlyBookData>("/admin/monthly-book", "POST", payload);
+  return fetchAPI<MonthlyBookData>('/admin/monthly-book', 'POST', payload);
 }
 
 export function getAdminMonthlyBooks() {
-  return fetchAPI<MonthlyBookData[]>("/admin/monthly-book");
+  return fetchAPI<MonthlyBookData[]>('/admin/monthly-book');
 }
 
 export function getCurrentMonthlyBooks() {
-  return fetchAPI<MonthlyBookData[]>("/admin/monthly-book/current");
+  return fetchAPI<MonthlyBookData[]>('/admin/monthly-book/current');
 }
 
 export function getMonthlyBooks(year: number, month: number) {
@@ -403,7 +409,7 @@ export function getMonthlyBooks(year: number, month: number) {
 }
 
 export function deleteAdminMonthlyBook(id: string) {
-  return fetchAPI<void>(`/admin/monthly-book/${id}`, "DELETE");
+  return fetchAPI<void>(`/admin/monthly-book/${id}`, 'DELETE');
 }
 
 // Admin: Schedule
@@ -412,17 +418,17 @@ export function createAdminSchedule(payload: {
   description?: string;
   date: string;
   time?: string;
-  type?: "MEETING" | "SHELLCAST" | "DIGGING_CLUB" | "MOVIE_NIGHT" | "BOOGITOUT";
+  type?: 'MEETING' | 'SHELLCAST' | 'DIGGING_CLUB' | 'MOVIE_NIGHT' | 'BOOGITOUT';
 }) {
-  return fetchAPI<ScheduleData>("/admin/schedule", "POST", payload);
+  return fetchAPI<ScheduleData>('/admin/schedule', 'POST', payload);
 }
 
 export function getAdminSchedules() {
-  return fetchAPI<ScheduleData[]>("/admin/schedule");
+  return fetchAPI<ScheduleData[]>('/admin/schedule');
 }
 
 export function getWeekSchedules() {
-  return fetchAPI<ScheduleData[]>("/admin/schedule/week");
+  return fetchAPI<ScheduleData[]>('/admin/schedule/week');
 }
 
 export function getMonthSchedules(year: number, month: number) {
@@ -433,11 +439,11 @@ export function updateAdminSchedule(
   id: string,
   payload: Partial<ScheduleData>,
 ) {
-  return fetchAPI<ScheduleData>(`/admin/schedule/${id}`, "PATCH", payload);
+  return fetchAPI<ScheduleData>(`/admin/schedule/${id}`, 'PATCH', payload);
 }
 
 export function deleteAdminSchedule(id: string) {
-  return fetchAPI<void>(`/admin/schedule/${id}`, "DELETE");
+  return fetchAPI<void>(`/admin/schedule/${id}`, 'DELETE');
 }
 
 // TableLog (식탁 방명록) 관련
@@ -471,15 +477,15 @@ export interface TableLogLeaderboard {
 
 // 내 식탁 참여 통계
 export function getMyTableLogStats() {
-  return fetchAPI<TableLogStats>("/table-logs/stats");
+  return fetchAPI<TableLogStats>('/table-logs/stats');
 }
 
 // 월별 전체 통계 (관리자용)
 export function getTableLogMonthly(year?: number, month?: number) {
   const params = new URLSearchParams();
-  if (year) params.append("year", String(year));
-  if (month) params.append("month", String(month));
-  const query = params.toString() ? `?${params.toString()}` : "";
+  if (year) params.append('year', String(year));
+  if (month) params.append('month', String(month));
+  const query = params.toString() ? `?${params.toString()}` : '';
   return fetchAPI<TableLogMonthly>(`/table-logs/monthly${query}`);
 }
 
@@ -509,9 +515,9 @@ export interface MonthlyLeaderboard {
 
 export function getMonthlyLeaderboard(year?: number, month?: number) {
   const params = new URLSearchParams();
-  if (year) params.append("year", String(year));
-  if (month) params.append("month", String(month));
-  const query = params.toString() ? `?${params.toString()}` : "";
+  if (year) params.append('year', String(year));
+  if (month) params.append('month', String(month));
+  const query = params.toString() ? `?${params.toString()}` : '';
   return fetchAPI<MonthlyLeaderboard>(
     `/table-logs/monthly-leaderboard${query}`,
   );
@@ -542,9 +548,9 @@ export interface DiggingPublicResponse {
 
 export function getPublicDiggings(page = 1, limit = 20, hashtag?: string) {
   const params = new URLSearchParams();
-  params.append("page", String(page));
-  params.append("limit", String(limit));
-  if (hashtag) params.append("hashtag", hashtag);
+  params.append('page', String(page));
+  params.append('limit', String(limit));
+  if (hashtag) params.append('hashtag', hashtag);
   return fetchAPI<DiggingPublicResponse>(
     `/digging/public?${params.toString()}`,
   );
@@ -555,22 +561,22 @@ export function formatDateTime(
   date: string | Date,
   includeTime = true,
 ): string {
-  const d = typeof date === "string" ? new Date(date) : date;
+  const d = typeof date === 'string' ? new Date(date) : date;
 
   const options: Intl.DateTimeFormatOptions = {
-    timeZone: "Asia/Seoul",
-    year: "numeric",
-    month: "long",
-    day: "numeric",
-    weekday: "short",
+    timeZone: 'Asia/Seoul',
+    year: 'numeric',
+    month: 'long',
+    day: 'numeric',
+    weekday: 'short',
   };
 
   if (includeTime) {
-    options.hour = "2-digit";
-    options.minute = "2-digit";
+    options.hour = '2-digit';
+    options.minute = '2-digit';
   }
 
-  return d.toLocaleString("ko-KR", options);
+  return d.toLocaleString('ko-KR', options);
 }
 
 // 날짜만 포맷 (시간 제외)
