@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router';
 import type { Route } from './+types/admin.events.create';
-import { createAdminEvent, getMe } from '../lib/api';
+import { createAdminEvent, getMe, type EventType } from '../lib/api';
 
 export function meta({}: Route.MetaArgs) {
   return [
@@ -18,9 +18,23 @@ export default function AdminEventsCreate() {
     content: '',
     date: '',
     location: '',
+    eventType: 'MEETING' as EventType,
     maxParticipants: 15,
     requiredCoins: 0,
+    price: 30000,
   });
+
+  const EVENT_TYPE_OPTIONS: {
+    value: EventType;
+    label: string;
+    price: number;
+  }[] = [
+    { value: 'MEETING', label: '대면모임', price: 30000 },
+    { value: 'DIGGING_CLUB', label: '디깅클럽', price: 10000 },
+    { value: 'BOOGITOUT', label: '부깃 아웃', price: 50000 },
+    { value: 'ONLINE', label: '온라인', price: 5000 },
+    { value: 'OTHER', label: '기타', price: 0 },
+  ];
 
   useEffect(() => {
     const token = localStorage.getItem('auth_token');
@@ -52,8 +66,9 @@ export default function AdminEventsCreate() {
       await createAdminEvent({
         ...formData,
         date,
-        maxParticipants: Number(formData.maxParticipants),
-        requiredCoins: Number(formData.requiredCoins),
+        eventType: formData.eventType,
+        maxParticipants: Number(formData.maxParticipants) || 15,
+        requiredCoins: Number(formData.requiredCoins) || 0,
       });
       alert('이벤트가 생성되었습니다!');
       navigate('/admin');
@@ -115,8 +130,36 @@ export default function AdminEventsCreate() {
                   setFormData({ ...formData, title: e.target.value })
                 }
                 className='w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent dark:bg-gray-700 dark:text-white'
-                placeholder='예: 2월 북토크'
+                placeholder='모임 제목'
               />
+            </div>
+
+            <div>
+              <label className='block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2'>
+                이벤트 타입 *
+              </label>
+              <div className='flex flex-wrap gap-2'>
+                {EVENT_TYPE_OPTIONS.map((opt) => (
+                  <button
+                    key={opt.value}
+                    type='button'
+                    onClick={() =>
+                      setFormData({
+                        ...formData,
+                        eventType: opt.value,
+                        price: opt.price,
+                      })
+                    }
+                    className={`px-4 py-2 rounded-lg border text-sm font-medium transition-colors ${
+                      formData.eventType === opt.value
+                        ? 'border-green-600 bg-green-600 text-white dark:border-green-500 dark:bg-green-500'
+                        : 'border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-700 hover:bg-gray-50 dark:hover:bg-gray-600'
+                    }`}
+                  >
+                    {opt.label}
+                  </button>
+                ))}
+              </div>
             </div>
 
             <div>

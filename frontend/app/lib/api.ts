@@ -61,7 +61,12 @@ async function fetchAPI<T>(
   return JSON.parse(text) as T;
 }
 
-export type EventType = 'MEETING' | 'DIGGING_CLUB' | 'ONLINE' | 'OTHER';
+export type EventType =
+  | 'MEETING'
+  | 'DIGGING_CLUB'
+  | 'BOOGITOUT'
+  | 'ONLINE'
+  | 'OTHER';
 
 export interface UserData {
   id: string;
@@ -84,6 +89,7 @@ export interface EventData {
   eventType?: EventType;
   price?: number;
   capacity?: number | null;
+  requiredCoins?: number | null;
   maxParticipants?: number | null;
   applications?: { id: string }[] | null; // 신청자 목록
 }
@@ -168,17 +174,8 @@ export function deleteEvent(id: string) {
 export interface EventEligibility {
   eligible: boolean;
   reason?: string;
-  currentOrder: number;
-  maxParticipants: number;
-  isOverCapacity: boolean;
-  requiredCoins: number;
-  userCoins: number;
-  price: number;
-  eventType: string;
-  isTerras: boolean;
-  isNewMember: boolean;
-  isVisitor: boolean;
   isFree: boolean;
+  isOverCapacity: boolean;
   libraryMessageCount: number;
   alreadyApplied: boolean;
   existingStatus?: string;
@@ -326,6 +323,7 @@ export function createAdminEvent(payload: {
   content?: string;
   date: string;
   location: string;
+  eventType?: EventType;
   maxParticipants: number;
   requiredCoins?: number;
 }) {
