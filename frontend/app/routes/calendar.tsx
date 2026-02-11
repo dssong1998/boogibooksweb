@@ -8,7 +8,6 @@ import {
   type ScheduleData,
 } from '../lib/api';
 import { CalendarSticker } from '../components/CalendarSticker';
-import { index } from '@react-router/dev/routes';
 
 export function meta({}: Route.MetaArgs) {
   return [
