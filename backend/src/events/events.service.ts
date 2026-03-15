@@ -245,8 +245,10 @@ export class EventsService {
     // VISITOR는 이벤트 신청 불가
     const isVisitor = userRole === 'VISITOR';
 
-    // 테라스 멤버 또는 뉴멤버는 무료
-    const isFree = isTerras || isNewMember;
+    // OTHER 타입은 모두 유료(결제). 그 외에는 테라스/뉴멤버 무료
+    /* eslint-disable-next-line @typescript-eslint/no-unsafe-member-access */
+    const eventType = event?.eventType as string | undefined;
+    const isFree = eventType === 'OTHER' ? false : isTerras || isNewMember;
 
     // 이미 신청했는지 확인
     /* eslint-disable @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access */
@@ -381,7 +383,7 @@ export class EventsService {
 
     // 서재 활동 확인 (뉴멤버는 스킵)
     let libraryActivity = { hasActivity: true, messageCount: 0 };
-    /* eslint-disable-next-line @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access */
+    /* eslint-disable-next-line @typescript-eslint/no-unsafe-member-access */
     if (event.eventType === 'MEETING') {
       libraryActivity = isNewMember
         ? { hasActivity: true, messageCount: 0 }
@@ -399,9 +401,14 @@ export class EventsService {
     let usedCoins = 0;
     let status = 'PENDING'; // 기본: 관리자 승인 대기
 
-    // 뉴멤버: 바로 CONFIRMED (승인 없이 확정)
-    // eslint-disable-next-line
-    if (isNewMember || event.eventType !== 'MEETING') {
+    // OTHER: 선착순 자동 승인 → 결제 대기(APPROVED), 테라스/뉴멤버 구분 없이 모두 결제
+    /* eslint-disable-next-line @typescript-eslint/no-unsafe-member-access */
+    const eventTypeApply = event.eventType as string;
+    if (eventTypeApply === 'OTHER') {
+      status = 'APPROVED';
+    }
+    // 뉴멤버 또는 MEETING이 아닌 타입: 바로 CONFIRMED (승인 없이 확정)
+    else if (isNewMember || eventTypeApply !== 'MEETING') {
       status = 'CONFIRMED';
     }
     // 코인 사용: COIN_GUARANTEED (정원 외 보장)
@@ -423,6 +430,8 @@ export class EventsService {
     }
     // 일반 신청: PENDING (관리자 승인 대기)
 
+    const isOtherEvent = eventTypeApply === 'OTHER';
+
     // 신청 생성 (서재 활동 수, 뉴멤버 여부 기록)
     // eslint-disable-next-line @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access
     await (this.prisma as any).eventApplication.create({
@@ -442,10 +451,38 @@ export class EventsService {
         usedCoins,
         libraryMessageCount: libraryActivity.messageCount,
         isNewMember, // 신청 시점의 뉴멤버 여부 기록
-        paidAt: isNewMember ? new Date() : null, // 뉴멤버는 바로 확정
-        approvedAt: isNewMember ? new Date() : null,
+        paidAt: isOtherEvent ? null : isNewMember ? new Date() : null,
+        approvedAt: isOtherEvent || isNewMember ? new Date() : null,
       },
     });
+
+    // OTHER: 선착순 자동 승인 → 결제 안내 DM 전송 (테라스/뉴멤버 동일)
+    if (isOtherEvent) {
+      /* eslint-disable-next-line @typescript-eslint/no-unsafe-member-access */
+      const eventPrice = Number(event.price) || 0;
+      /* eslint-disable-next-line @typescript-eslint/no-unsafe-member-access */
+      const eventTitle = String(event.title);
+      await this.sendPaymentDM(
+        discordId,
+        userId,
+        eventId,
+        eventTitle,
+        eventPrice,
+        applicationOrder,
+        false,
+        0,
+      );
+      const otherMessage = `${applicationOrder}번째로 신청되었습니다. 선착순 자동 승인되어 결제 안내를 확인해 주세요.`;
+      return {
+        success: true,
+        applicationOrder,
+        status,
+        usedCoins,
+        isFree: false,
+        message: otherMessage,
+        libraryMessageCount: libraryActivity.messageCount,
+      };
+    }
 
     // 뉴멤버는 isNewMember 플래그 해제 (첫 모임 무료 혜택 사용)
     if (isNewMember) {
@@ -597,8 +634,23 @@ export class EventsService {
         continue;
       }
 
+      const eventTypeApprove = event.eventType as string;
+      const isOtherEvent = eventTypeApprove === 'OTHER';
+
+      // OTHER 이벤트: 테라스/뉴멤버 구분 없이 모두 APPROVED + 결제 안내
+      if (isOtherEvent) {
+        await (this.prisma as any).eventApplication.update({
+          where: { id: appId },
+          data: { status: 'APPROVED', approvedAt: new Date() },
+        });
+        paymentUsers.push({
+          userId: appUserId,
+          discordId: userDiscordId,
+          applicationOrder: appOrder,
+        });
+      }
       // 테라스 멤버 또는 뉴멤버: CONFIRMED + 참석 확정 DM (무료)
-      if (userIsTerras || appIsNewMember) {
+      else if (userIsTerras || appIsNewMember) {
         await (this.prisma as any).eventApplication.update({
           where: { id: appId },
           data: {
