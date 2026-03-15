@@ -147,7 +147,7 @@ export default function AdminEventsCreate() {
                       setFormData({
                         ...formData,
                         eventType: opt.value,
-                        price: opt.price,
+                        price: opt.value === 'OTHER' ? formData.price : opt.price,
                       })
                     }
                     className={`px-4 py-2 rounded-lg border text-sm font-medium transition-colors ${
@@ -161,6 +161,28 @@ export default function AdminEventsCreate() {
                 ))}
               </div>
             </div>
+
+            {formData.eventType === 'OTHER' && (
+              <div>
+                <label className='block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1'>
+                  가격 (원) *
+                </label>
+                <input
+                  type='number'
+                  required={formData.eventType === 'OTHER'}
+                  min={0}
+                  value={formData.price}
+                  onChange={(e) =>
+                    setFormData({
+                      ...formData,
+                      price: parseInt(e.target.value, 10) || 0,
+                    })
+                  }
+                  className='w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent dark:bg-gray-700 dark:text-white'
+                  placeholder='가격을 입력하세요'
+                />
+              </div>
+            )}
 
             <div>
               <label className='block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1'>
