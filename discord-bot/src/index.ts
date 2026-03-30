@@ -17,11 +17,13 @@ import {
   isValidLibraryMessage,
 } from './lib/libraryActivity';
 import { pushLibraryActivityToBackend } from './lib/pushLibraryActivity';
+import axios from 'axios';
 
 dotenv.config();
 
 const GUILD_ID = process.env.DISCORD_GUILD_ID;
 const ADMIN_ID1 = process.env.ADMIN_ID1;
+const BACKEND_URL = process.env.BACKEND_API_URL || 'http://localhost:3000';
 
 const client = new Client({
   intents: [
@@ -78,22 +80,84 @@ function isSnowflakeThisMonth(snowflakeId: string): boolean {
   return ts >= first.getTime();
 }
 
-/** 서재 유효 활동 → 백엔드 실시간 반영 */
+function parseThreadTitle(name: string): { title: string; author: string } {
+  const raw = (name || '').trim();
+  if (!raw) return { title: '제목 없음', author: '작가 미상' };
+
+  if (raw.includes(',')) {
+    const parts = raw.split(',');
+    const t = parts[0]?.trim() || raw;
+    const a = parts.slice(1).join(',').trim() || '작가 미상';
+    return { title: t, author: a };
+  }
+  if (raw.includes(' - ')) {
+    const parts = raw.split(' - ');
+    const t = parts[0]?.trim() || raw;
+    const a = parts.slice(1).join(' - ').trim() || '작가 미상';
+    return { title: t, author: a };
+  }
+  return { title: raw, author: '작가 미상' };
+}
+
+async function seedBookFromThread(threadId: string) {
+  // threadId로 fetch
+  const thread = await client.channels.fetch(threadId).catch(() => null);
+  if (!thread || !thread.isThread()) return null;
+
+  const starter = await thread.fetchStarterMessage().catch(() => null);
+  const discordUserId = starter?.author?.id || thread.ownerId || '';
+  if (!discordUserId) return null;
+
+  const { title, author } = parseThreadTitle(thread.name);
+  const description = starter?.content?.trim() || '';
+
+  const res = await axios.post(
+    `${BACKEND_URL}/books/seed`,
+    {
+      discordUserId,
+      title,
+      author,
+      description,
+      threadId: thread.id,
+    },
+    { timeout: 20000 },
+  );
+  return res.data as { id: string };
+}
+
+async function seedCommentFromMessage(bookId: string, message: Message) {
+  if (message.author.bot) return;
+  const content = (message.content || '').trim();
+  if (!content) return;
+
+  await axios.post(
+    `${BACKEND_URL}/comments/seed`,
+    {
+      bookId,
+      discordUserId: message.author.id,
+      content,
+      type: 'REVIEW',
+      createdAt: new Date(message.createdTimestamp).toISOString(),
+      messageId: message.id,
+    },
+    { timeout: 20000 },
+  );
+}
+
+/** 서재 메시지 전부 → 백엔드 반영 (유효 여부는 별도 플래그로 집계) */
 async function handleLibraryActivityMessage(message: Message): Promise<void> {
   if (!isMessageInLibraryChannel(message)) return;
   if (message.author.bot) return;
 
-  if (message.channel.isThread() && message.id === message.channel.id) {
-    return;
-  }
-
-  if (!isValidLibraryMessage(message.content)) return;
+  const valid = isValidLibraryMessage(message.content);
+  if (!valid) return;
 
   await pushLibraryActivityToBackend({
     discordUserId: message.author.id,
     sourceId: `msg:${message.id}`,
     kind: 'message',
     occurredAt: new Date(message.createdTimestamp).toISOString(),
+    isValidForEvent: true,
   });
 }
 
@@ -139,6 +203,19 @@ client.on(Events.MessageCreate, async (message: Message) => {
   if (isMessageInLibraryChannel(message)) {
     await handleBookMessage(message);
     await handleLibraryActivityMessage(message);
+
+    // 포럼 스레드 메시지라면: Book/Comment 반영
+    if (message.channel.isThread()) {
+      const threadId = message.channel.id;
+      try {
+        const book = await seedBookFromThread(threadId);
+        if (book?.id) {
+          await seedCommentFromMessage(book.id, message);
+        }
+      } catch (e) {
+        // 실패해도 메시지 처리 흐름은 계속
+      }
+    }
   }
 
   if (message.channel.id === process.env.DIGGING_CHANNEL_ID) {
@@ -160,7 +237,24 @@ client.on(Events.ThreadCreate, async (thread) => {
     sourceId: `thread:${thread.id}`,
     kind: 'thread',
     occurredAt: new Date(thread.createdTimestamp ?? Date.now()).toISOString(),
+    isValidForEvent: true,
   });
+
+  // 스레드 생성 시점에 Book 생성 (실패해도 무시)
+  try {
+    await axios.post(
+      `${BACKEND_URL}/books/seed`,
+      {
+        discordUserId: thread.ownerId,
+        ...parseThreadTitle(thread.name),
+        description: '',
+        threadId: thread.id,
+      },
+      { timeout: 20000 },
+    );
+  } catch {
+    // noop
+  }
 });
 
 client.on(Events.VoiceStateUpdate, async (oldState, newState) => {

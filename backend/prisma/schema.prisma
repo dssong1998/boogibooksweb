@@ -83,6 +83,7 @@ model Book {
   id          String    @id @default(uuid())
   userId      String
   user        User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  discordThreadId String? @unique
   title       String
   author      String
   isbn        String?
@@ -100,6 +101,7 @@ model Comment {
   user      User        @relation(fields: [userId], references: [id], onDelete: Cascade)
   bookId    String
   book      Book        @relation(fields: [bookId], references: [id], onDelete: Cascade)
+  discordMessageId String? @unique
   type      CommentType @default(REVIEW)
   content   String
   page      Int?
@@ -182,15 +184,17 @@ enum UserRole {
 }
 // 테라스 멤버 여부는 User.isTerras 필드로 관리
 
-// 디스코드 봇이 서재(포럼) 활동을 푸시할 때 집계 (이벤트 자격 등)
+// 디스코드 봇이 서재(포럼) 활동을 푸시할 때 집계
+// messageCount: 유효/비유효 포함 전체 기록 건수
+// validForEventCount: 이벤트 신청 자격 판단용(Preview/리뷰 규칙 등) 충족 건수
 model LibraryActivityMonth {
-  id            String   @id @default(uuid())
-  discordUserId String
-  year          Int
-  month         Int
-  messageCount  Int      @default(0)
-  hasActivity   Boolean  @default(false)
-  updatedAt     DateTime @updatedAt
+  id                 String   @id @default(uuid())
+  discordUserId      String
+  year               Int
+  month              Int
+  messageCount       Int      @default(0)
+  validForEventCount Int      @default(0)
+  updatedAt          DateTime @updatedAt
 
   @@unique([discordUserId, year, month])
   @@index([discordUserId])
@@ -198,8 +202,9 @@ model LibraryActivityMonth {
 
 // 동일 Discord 이벤트(메시지/스레드) 중복 반영 방지
 model LibraryActivityAck {
-  id            String   @id @default(uuid())
-  sourceId      String   @unique
-  discordUserId String
-  createdAt     DateTime @default(now())
+  id                String   @id @default(uuid())
+  sourceId          String   @unique
+  discordUserId     String
+  isValidForEvent   Boolean  @default(false)
+  createdAt         DateTime @default(now())
 }

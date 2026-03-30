@@ -3,7 +3,8 @@
  *
  * 목적:
  * - 리스너 도입 전에, 서재(포럼) 전체 스레드/메시지를 전수 스캔
- * - 유효 활동(Preview/Review/프리뷰/리뷰 시작 또는 1000자 이상)만
+ * - 메시지/스레드 이벤트는 **전부** 백엔드에 반영 (유효 여부는 isValidForEvent로 별도 집계)
+ * - 이벤트 자격(Preview/리뷰 규칙)은 신청 시점에만 쓰는 값이며, DB에는 비유효 포함 전체 기록
  * - 중복은 백엔드 ack(sourceId 유니크)로 자동 스킵
  * - 발생 시각 기준(year/month)으로 백엔드 집계에 반영 (occurredAt)
  *
@@ -28,7 +29,10 @@ import {
   type Message,
 } from 'discord.js';
 import dotenv from 'dotenv';
-import { getLibraryParentChannelId, isValidLibraryMessage } from '../lib/libraryActivity';
+import {
+  getLibraryParentChannelId,
+  isValidLibraryMessage,
+} from '../lib/libraryActivity';
 import { pushLibraryActivityToBackend } from '../lib/pushLibraryActivity';
 
 dotenv.config();
@@ -38,7 +42,9 @@ const GUILD_ID = process.env.DISCORD_GUILD_ID;
 
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
-async function fetchAllForumThreads(channel: ForumChannel): Promise<ThreadChannel[]> {
+async function fetchAllForumThreads(
+  channel: ForumChannel,
+): Promise<ThreadChannel[]> {
   const all: ThreadChannel[] = [];
 
   const active = await channel.threads.fetchActive().catch(() => null);
@@ -50,7 +56,9 @@ async function fetchAllForumThreads(channel: ForumChannel): Promise<ThreadChanne
   while (true) {
     const archived = (await channel.threads
       .fetchArchived({ limit: 100, before })
-      .catch(() => null)) as { threads: Collection<string, ThreadChannel> } | null;
+      .catch(() => null)) as {
+      threads: Collection<string, ThreadChannel>;
+    } | null;
     if (!archived) break;
 
     const batch: ThreadChannel[] = [...archived.threads.values()];
@@ -70,7 +78,9 @@ async function fetchAllForumThreads(channel: ForumChannel): Promise<ThreadChanne
   return [...uniq.values()];
 }
 
-async function fetchAllThreadMessages(thread: ThreadChannel): Promise<Message[]> {
+async function fetchAllThreadMessages(
+  thread: ThreadChannel,
+): Promise<Message[]> {
   const messages: Message[] = [];
   let before: string | undefined = undefined;
   // eslint-disable-next-line no-constant-condition
@@ -95,7 +105,8 @@ async function main() {
   if (!GUILD_ID) throw new Error('DISCORD_GUILD_ID 미설정');
 
   const libraryParentId = getLibraryParentChannelId();
-  if (!libraryParentId) throw new Error('DISCORD_LIBRARY_CHANNEL_ID 또는 BOOKS_CHANNEL_ID 미설정');
+  if (!libraryParentId)
+    throw new Error('DISCORD_LIBRARY_CHANNEL_ID 또는 BOOKS_CHANNEL_ID 미설정');
 
   const client = new Client({
     intents: [
@@ -110,7 +121,8 @@ async function main() {
       console.log(`✅ backfill 시작 (bot: ${client.user?.tag})`);
       const guild = await client.guilds.fetch(GUILD_ID);
       const ch = await guild.channels.fetch(libraryParentId);
-      if (!ch) throw new Error(`서재 채널을 찾지 못했습니다: ${libraryParentId}`);
+      if (!ch)
+        throw new Error(`서재 채널을 찾지 못했습니다: ${libraryParentId}`);
       if (ch.type !== ChannelType.GuildForum) {
         throw new Error(`서재 채널이 포럼이 아닙니다. type=${ch.type}`);
       }
@@ -133,26 +145,30 @@ async function main() {
             discordUserId: ownerId,
             sourceId: `thread:${thread.id}`,
             kind: 'thread',
-            occurredAt: new Date(thread.createdTimestamp ?? Date.now()).toISOString(),
+            occurredAt: new Date(
+              thread.createdTimestamp ?? Date.now(),
+            ).toISOString(),
+            isValidForEvent: true,
           });
           pushed++;
         }
 
-        // 2) 스레드 내 메시지들 중 유효 메시지 반영
+        // 2) 스레드 내 메시지 전부 반영 (유효 여부는 플래그)
         const msgs = await fetchAllThreadMessages(thread);
         for (const msg of msgs) {
           if (msg.author?.bot) {
             skippedBots++;
             continue;
           }
-          if (!isValidLibraryMessage(msg.content)) continue;
+          const valid = isValidLibraryMessage(msg.content);
+          if (valid) validMessages++;
 
-          validMessages++;
           await pushLibraryActivityToBackend({
             discordUserId: msg.author.id,
             sourceId: `msg:${msg.id}`,
             kind: 'message',
             occurredAt: new Date(msg.createdTimestamp).toISOString(),
+            isValidForEvent: valid,
           });
           pushed++;
         }
@@ -183,4 +199,3 @@ async function main() {
 }
 
 void main();
-

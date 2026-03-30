@@ -33,6 +33,7 @@ export class LibraryActivityController {
       sourceId: body.sourceId,
       kind: body.kind,
       occurredAt: body.occurredAt,
+      isValidForEvent: body.isValidForEvent,
     });
   }
 }

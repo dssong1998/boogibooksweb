@@ -91,7 +91,7 @@ export class EventsService {
   ): Promise<{ hasActivity: boolean; messageCount: number }> {
     const snapshot =
       await this.libraryActivity.getCurrentMonthSnapshot(discordUserId);
-    if (snapshot?.hasActivity) {
+    if (snapshot && snapshot.validForEventCount > 0) {
       return {
         hasActivity: true,
         messageCount: snapshot.messageCount,
@@ -740,13 +740,25 @@ export class EventsService {
       maxParticipants,
     );
 
-    // finalizeApproval이 true면 미승인 PENDING 신청자에게 거절 DM 전송
+    // finalizeApproval=true면 남은 신청자들을 '마감 처리' 규칙대로 정리
+    // - 코인 사용자 / 뉴멤버: 승인 처리
+    //   - 유료 대상: APPROVED + 결제 안내 DM
+    //   - 무료 대상: CONFIRMED + 확정 안내 DM
+    // - 그 외: CANCELLED + 거절 DM
     let rejectedCount = 0;
     if (finalizeApproval) {
-      rejectedCount = await this.sendRejectionToRemainingApplicants(
+      const finalized = await this.finalizeRemainingApplicants({
         eventId,
         eventTitle,
-      );
+        eventPrice,
+        eventLocation,
+        eventDate,
+        /* eslint-disable-next-line @typescript-eslint/no-unsafe-member-access */
+        eventType: event.eventType as string,
+      });
+      rejectedCount = finalized.rejectedCount;
+      dmSent += finalized.dmSent;
+      coinRefunded.push(...finalized.coinRefunded);
     }
 
     return {
@@ -756,6 +768,136 @@ export class EventsService {
       autoApprovedCoinUsers: autoApproved,
       rejectedCount,
     };
+  }
+
+  private async finalizeRemainingApplicants(input: {
+    eventId: string;
+    eventTitle: string;
+    eventPrice: number;
+    eventLocation: string;
+    eventDate: Date;
+    eventType: string;
+  }): Promise<{
+    rejectedCount: number;
+    dmSent: number;
+    coinRefunded: { userId: string; coins: number; discordId: string }[];
+  }> {
+    /* eslint-disable @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access */
+    const pendingApplications = await (
+      this.prisma as any
+    ).eventApplication.findMany({
+      where: {
+        eventId: input.eventId,
+        status: { in: ['PENDING', 'COIN_GUARANTEED'] },
+      },
+      include: { user: true },
+      orderBy: { applicationOrder: 'asc' },
+    });
+
+    let rejectedCount = 0;
+    let dmSent = 0;
+    const coinRefunded: { userId: string; coins: number; discordId: string }[] =
+      [];
+
+    const isOtherEvent = input.eventType === 'OTHER';
+
+    for (const app of pendingApplications as any[]) {
+      const appId = app.id as string;
+      const appUserId = app.userId as string;
+      const appOrder = app.applicationOrder as number;
+      const usedCoins = (app.usedCoins as number) || 0;
+      const appIsNewMember = app.isNewMember as boolean;
+
+      const userDiscordId = app.user.discordId as string;
+      const userIsTerras = app.user.isTerras as boolean;
+
+      const isCoinUser = usedCoins > 0;
+      const shouldApprove = isCoinUser || appIsNewMember;
+
+      const isFreeTarget = !isOtherEvent && (userIsTerras || appIsNewMember);
+
+      // 코인 사용자는 마감 처리 시 코인 환불 (결제 여부와 무관)
+      if (isCoinUser) {
+        await (this.prisma as any).user.update({
+          where: { id: appUserId },
+          data: { coins: { increment: usedCoins } },
+        });
+        coinRefunded.push({
+          userId: appUserId,
+          coins: usedCoins,
+          discordId: userDiscordId,
+        });
+      }
+
+      if (shouldApprove) {
+        if (isFreeTarget) {
+          await (this.prisma as any).eventApplication.update({
+            where: { id: appId },
+            data: {
+              status: 'CONFIRMED',
+              approvedAt: new Date(),
+              paidAt: new Date(),
+              usedCoins: 0,
+            },
+          });
+
+          // 뉴멤버가 확정되면 isNewMember 플래그 해제 (첫 모임 무료 혜택 사용)
+          if (appIsNewMember) {
+            await (this.prisma as any).user.update({
+              where: { id: appUserId },
+              data: { isNewMember: false },
+            });
+          }
+
+          const sent = await this.sendConfirmationDM(
+            userDiscordId,
+            input.eventTitle,
+            input.eventLocation,
+            input.eventDate,
+            false,
+            0,
+            appIsNewMember,
+          );
+          if (sent) dmSent++;
+        } else {
+          // 유료 대상(코인 사용자 포함): APPROVED + 결제 안내
+          await (this.prisma as any).eventApplication.update({
+            where: { id: appId },
+            data: {
+              status: 'APPROVED',
+              approvedAt: new Date(),
+              usedCoins: 0,
+            },
+          });
+
+          const sent = await this.sendPaymentDM(
+            userDiscordId,
+            appUserId,
+            input.eventId,
+            input.eventTitle,
+            input.eventPrice,
+            appOrder,
+            isCoinUser,
+            usedCoins,
+          );
+          if (sent) dmSent++;
+        }
+      } else {
+        // 그 외는 거절
+        await (this.prisma as any).eventApplication.update({
+          where: { id: appId },
+          data: { status: 'CANCELLED' },
+        });
+        const sent = await this.sendRejectionDM(
+          userDiscordId,
+          input.eventTitle,
+        );
+        if (sent) rejectedCount++;
+      }
+    }
+    /* eslint-enable @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access */
+
+    return { rejectedCount, dmSent, coinRefunded };
   }
 
   // 미승인 PENDING 신청자에게 거절 DM 전송

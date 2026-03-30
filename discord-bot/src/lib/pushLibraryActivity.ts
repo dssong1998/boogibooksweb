@@ -7,6 +7,8 @@ export async function pushLibraryActivityToBackend(payload: {
   sourceId: string;
   kind: 'message' | 'thread';
   occurredAt: string;
+  /** 이벤트 신청 자격 규칙 충족 여부 — DB에는 전체 기록 + 이 플래그로 별도 집계 */
+  isValidForEvent: boolean;
 }): Promise<void> {
   const secret = process.env.BOT_INTERNAL_SECRET;
   if (!secret) {
@@ -24,6 +26,7 @@ export async function pushLibraryActivityToBackend(payload: {
         sourceId: payload.sourceId,
         kind: payload.kind,
         occurredAt: payload.occurredAt,
+        isValidForEvent: payload.isValidForEvent,
       },
       {
         headers: {

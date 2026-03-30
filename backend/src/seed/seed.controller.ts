@@ -86,6 +86,14 @@ export class SeedController {
         });
       }
 
+      // threadId 기반 중복 방지 (있을 때만)
+      if (data.threadId) {
+        const existingByThreadId = await (this.prisma as any).book.findFirst({
+          where: { discordThreadId: data.threadId },
+        });
+        if (existingByThreadId) return existingByThreadId;
+      }
+
       // 중복 체크 (같은 유저의 같은 책)
       // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access
       const existing = await (this.prisma as any).book.findFirst({
@@ -105,6 +113,7 @@ export class SeedController {
         data: {
           // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-assignment
           userId: user.id,
+          discordThreadId: data.threadId || null,
           title: data.title,
           author: data.author,
           isbn: data.isbn,
@@ -133,6 +142,7 @@ export class SeedController {
       content: string;
       type?: string;
       createdAt?: string;
+      messageId?: string;
     },
   ) {
     try {
@@ -153,12 +163,23 @@ export class SeedController {
         });
       }
 
+      // messageId 기반 중복 방지 (있을 때만)
+      if (data.messageId) {
+        const existingByMessageId = await (this.prisma as any).comment.findFirst(
+          {
+            where: { discordMessageId: data.messageId },
+          },
+        );
+        if (existingByMessageId) return existingByMessageId;
+      }
+
       // eslint-disable-next-line @typescript-eslint/no-unsafe-return, @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access
       return await (this.prisma as any).comment.create({
         data: {
           bookId: data.bookId,
           // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-assignment
           userId: user.id,
+          discordMessageId: data.messageId || null,
           content: data.content,
           type: data.type || 'REVIEW',
           createdAt: data.createdAt ? new Date(data.createdAt) : new Date(),

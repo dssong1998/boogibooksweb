@@ -1,4 +1,4 @@
-import { IsIn, IsString, MinLength } from 'class-validator';
+import { IsBoolean, IsIn, IsString, MinLength } from 'class-validator';
 
 export class RecordLibraryActivityDto {
   @IsString()
@@ -17,4 +17,8 @@ export class RecordLibraryActivityDto {
   @IsString()
   @MinLength(1)
   occurredAt: string;
+
+  /** 이벤트 신청 자격(Preview/리뷰 규칙 등)에 해당하는지 — DB에는 전부 저장하되 별도 집계 */
+  @IsBoolean()
+  isValidForEvent: boolean;
 }
