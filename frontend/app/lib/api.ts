@@ -96,6 +96,7 @@ export interface EventData {
 
 export interface BookData {
   id: string;
+  userId?: string;
   title: string;
   author: string;
   isbn?: string | null;

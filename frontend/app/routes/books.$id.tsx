@@ -252,12 +252,14 @@ export default function BookDetail() {
               )}
 
               <div className="space-y-2">
-                <button
-                  onClick={handleRemoveBook}
-                  className="w-full px-4 py-2 bg-white dark:bg-gray-700 text-gray-900 dark:text-white border border-gray-300 dark:border-gray-600 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-600 transition-colors text-sm font-medium"
-                >
-                  서재에서 제거
-                </button>
+                {book?.userId && myUserId && book.userId === myUserId && (
+                  <button
+                    onClick={handleRemoveBook}
+                    className="w-full px-4 py-2 bg-white dark:bg-gray-700 text-gray-900 dark:text-white border border-gray-300 dark:border-gray-600 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-600 transition-colors text-sm font-medium"
+                  >
+                    서재에서 제거
+                  </button>
+                )}
               </div>
             </div>
           </div>

@@ -36,11 +36,22 @@ export class BooksService {
   }
 
   async findAll(userId: string) {
-    // 특정 사용자의 모든 책 조회
+    // 특정 사용자의 서재: 내가 등록한 책 + 내가 코멘트를 남긴 책
     // eslint-disable-next-line @typescript-eslint/no-unsafe-return, @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access
     return await (this.prisma as any).book.findMany({
-      where: { userId },
-      orderBy: { createdAt: 'desc' },
+      where: {
+        OR: [
+          { userId },
+          {
+            comments: {
+              some: {
+                userId,
+              },
+            },
+          },
+        ],
+      },
+      orderBy: { updatedAt: 'desc' },
     });
   }
 
