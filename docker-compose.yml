@@ -131,6 +131,11 @@ services:
       - ./nginx/conf.d:/etc/nginx/conf.d:ro
       - ./certbot/www:/var/www/certbot:ro
       - ./certbot/conf:/etc/letsencrypt:ro
+    # 매 deploy(컨테이너 재생성/재시작)마다 nginx 캐시 초기화
+    tmpfs:
+      - /var/cache/nginx
+    command: >
+      /bin/sh -c "rm -rf /var/cache/nginx/* 2>/dev/null || true; exec nginx -g 'daemon off;'"
     networks:
       - boogibooks-net
 

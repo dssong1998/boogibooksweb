@@ -25,6 +25,19 @@ const GUILD_ID = process.env.DISCORD_GUILD_ID;
 const ADMIN_ID1 = process.env.ADMIN_ID1;
 const BACKEND_URL = process.env.BACKEND_API_URL || 'http://localhost:3000';
 
+type NaverBookItem = {
+  title: string;
+  author: string;
+  isbn: string;
+  publisher: string;
+  image: string;
+  description?: string;
+};
+
+type NaverBookResponse = {
+  items?: NaverBookItem[];
+};
+
 const client = new Client({
   intents: [
     GatewayIntentBits.Guilds,
@@ -99,8 +112,52 @@ function parseThreadTitle(name: string): { title: string; author: string } {
   return { title: raw, author: '작가 미상' };
 }
 
+function stripNaverHighlight(s: string | undefined): string {
+  if (!s) return '';
+  return s.replace(/<\/?b>/g, '').trim();
+}
+
+async function buildBookDataFromNaver(input: {
+  title: string;
+  author: string;
+}): Promise<{
+  title: string;
+  author: string;
+  isbn?: string;
+  publisher?: string;
+  coverUrl?: string;
+  description?: string;
+}> {
+  const base = {
+    title: input.title,
+    author: input.author || '작가 미상',
+  };
+
+  try {
+    const searchQuery = input.author
+      ? `${input.title} ${input.author}`
+      : input.title;
+    const res = await axios.get<NaverBookResponse>(
+      `${BACKEND_URL}/books/search?query=${encodeURIComponent(searchQuery)}`,
+      { timeout: 20000 },
+    );
+    const item = res.data?.items?.[0];
+    if (!item) return base;
+
+    return {
+      title: stripNaverHighlight(item.title) || base.title,
+      author: item.author || base.author,
+      isbn: item.isbn,
+      publisher: item.publisher,
+      coverUrl: item.image,
+      description: stripNaverHighlight(item.description),
+    };
+  } catch {
+    return base;
+  }
+}
+
 async function seedBookFromThread(threadId: string) {
-  // threadId로 fetch
   const thread = await client.channels.fetch(threadId).catch(() => null);
   if (!thread || !thread.isThread()) return null;
 
@@ -108,16 +165,16 @@ async function seedBookFromThread(threadId: string) {
   const discordUserId = starter?.author?.id || thread.ownerId || '';
   if (!discordUserId) return null;
 
-  const { title, author } = parseThreadTitle(thread.name);
-  const description = starter?.content?.trim() || '';
+  const parsed = parseThreadTitle(thread.name);
+  const bookData = await buildBookDataFromNaver(parsed);
+  const description = starter?.content?.trim() || bookData.description || '';
 
   const res = await axios.post(
     `${BACKEND_URL}/books/seed`,
     {
-      discordUserId,
-      title,
-      author,
+      ...bookData,
       description,
+      discordUserId,
       threadId: thread.id,
     },
     { timeout: 20000 },
@@ -240,21 +297,10 @@ client.on(Events.ThreadCreate, async (thread) => {
     isValidForEvent: true,
   });
 
-  // 스레드 생성 시점에 Book 생성 (실패해도 무시)
+  // 스레드 생성 시점에 Book 생성(네이버 검색 포함, 실패해도 무시)
   try {
-    await axios.post(
-      `${BACKEND_URL}/books/seed`,
-      {
-        discordUserId: thread.ownerId,
-        ...parseThreadTitle(thread.name),
-        description: '',
-        threadId: thread.id,
-      },
-      { timeout: 20000 },
-    );
-  } catch {
-    // noop
-  }
+    await seedBookFromThread(thread.id);
+  } catch {}
 });
 
 client.on(Events.VoiceStateUpdate, async (oldState, newState) => {

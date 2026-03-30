@@ -466,6 +466,14 @@ async function main() {
   console.log('   부기북스 초기 시드 마이그레이션');
   console.log('========================================\n');
 
+  // 실행 옵션
+  // 예)
+  //  - 전체 실행: npx ts-node src/scripts/initialSeed.ts
+  //  - books만:   npx ts-node src/scripts/initialSeed.ts --only=books
+  const onlyArg = process.argv.find((a) => a.startsWith('--only='));
+  const only = onlyArg?.split('=')[1]?.trim() || '';
+  const seedOnlyBooks = only === 'books';
+
   if (!BOT_TOKEN || !GUILD_ID) {
     console.error('❌ DISCORD_BOT_TOKEN과 DISCORD_GUILD_ID가 필요합니다.');
     process.exit(1);
@@ -474,6 +482,9 @@ async function main() {
   // 확인 프롬프트
   console.log('⚠️  주의: 이 스크립트는 최초 1회만 실행해야 합니다!');
   console.log('   중복 실행 시 데이터가 중복될 수 있습니다.\n');
+  if (seedOnlyBooks) {
+    console.log('✅ 실행 모드: books만 시드합니다 (--only=books)\n');
+  }
   console.log('   계속하려면 10초 후 자동으로 시작됩니다...\n');
   await sleep(10000);
 
@@ -483,9 +494,11 @@ async function main() {
   const guild = await client.guilds.fetch(GUILD_ID);
   console.log(`✅ 서버 로드: ${guild.name}\n`);
 
-  // 1. 유저 시드
-  const members = await guild.members.fetch();
-  await seedUsers(members);
+  // 1. 유저 시드 (books-only면 스킵)
+  if (!seedOnlyBooks) {
+    const members = await guild.members.fetch();
+    await seedUsers(members);
+  }
 
   // 2. 서재에서 책 시드
   if (LIBRARY_CHANNEL_ID) {
@@ -500,26 +513,30 @@ async function main() {
   // 3. 코멘트는 책 시드 시 자동 처리됨
   console.log(`\n💬 [3/5] 코멘트: ${stats.comments.created}개 생성됨`);
 
-  // 4. 디깅박스 시드 (텍스트 채널의 메시지에서 URL 추출)
-  if (DIGGING_CHANNEL_ID) {
-    const diggingChannel = await guild.channels.fetch(DIGGING_CHANNEL_ID);
-    if (diggingChannel && diggingChannel.type === ChannelType.GuildText) {
-      await seedDiggings(diggingChannel as TextChannel);
+  // 4. 디깅박스 시드 (books-only면 스킵)
+  if (!seedOnlyBooks) {
+    if (DIGGING_CHANNEL_ID) {
+      const diggingChannel = await guild.channels.fetch(DIGGING_CHANNEL_ID);
+      if (diggingChannel && diggingChannel.type === ChannelType.GuildText) {
+        await seedDiggings(diggingChannel as TextChannel);
+      } else {
+        console.log('\n🔗 [4/5] 디깅박스 채널이 텍스트 채널이 아닙니다 - 스킵');
+      }
     } else {
-      console.log('\n🔗 [4/5] 디깅박스 채널이 텍스트 채널이 아닙니다 - 스킵');
+      console.log('\n🔗 [4/5] 디깅박스 채널 ID 미설정 - 스킵');
     }
-  } else {
-    console.log('\n🔗 [4/5] 디깅박스 채널 ID 미설정 - 스킵');
   }
 
-  // 5. 식탁 방명록 시드
-  if (TABLE_LOG_CHANNEL_ID) {
-    const tableLogChannel = await guild.channels.fetch(TABLE_LOG_CHANNEL_ID);
-    if (tableLogChannel && tableLogChannel.type === ChannelType.GuildText) {
-      await seedTableLogs(tableLogChannel as TextChannel, guild as Guild);
+  // 5. 식탁 방명록 시드 (books-only면 스킵)
+  if (!seedOnlyBooks) {
+    if (TABLE_LOG_CHANNEL_ID) {
+      const tableLogChannel = await guild.channels.fetch(TABLE_LOG_CHANNEL_ID);
+      if (tableLogChannel && tableLogChannel.type === ChannelType.GuildText) {
+        await seedTableLogs(tableLogChannel as TextChannel, guild as Guild);
+      }
+    } else {
+      console.log('\n🍽️ [5/5] 식탁방명록 채널 ID 미설정 - 스킵');
     }
-  } else {
-    console.log('\n🍽️ [5/5] 식탁방명록 채널 ID 미설정 - 스킵');
   }
 
   // 최종 통계

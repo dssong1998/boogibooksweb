@@ -816,18 +816,8 @@ export class EventsService {
 
       const isFreeTarget = !isOtherEvent && (userIsTerras || appIsNewMember);
 
-      // 코인 사용자는 마감 처리 시 코인 환불 (결제 여부와 무관)
-      if (isCoinUser) {
-        await (this.prisma as any).user.update({
-          where: { id: appUserId },
-          data: { coins: { increment: usedCoins } },
-        });
-        coinRefunded.push({
-          userId: appUserId,
-          coins: usedCoins,
-          discordId: userDiscordId,
-        });
-      }
+      // 코인 사용자는 '승인(마감)으로 인해 코인을 사용 처리'되는 케이스이므로 환불하지 않음.
+      // apply 시점에 coins decrement + usedCoins 기록(COIN_GUARANTEED)되어 있다고 가정하고 그대로 유지.
 
       if (shouldApprove) {
         if (isFreeTarget) {
@@ -837,7 +827,6 @@ export class EventsService {
               status: 'CONFIRMED',
               approvedAt: new Date(),
               paidAt: new Date(),
-              usedCoins: 0,
             },
           });
 
@@ -866,7 +855,6 @@ export class EventsService {
             data: {
               status: 'APPROVED',
               approvedAt: new Date(),
-              usedCoins: 0,
             },
           });
 
@@ -877,8 +865,8 @@ export class EventsService {
             input.eventTitle,
             input.eventPrice,
             appOrder,
-            isCoinUser,
-            usedCoins,
+            false,
+            0,
           );
           if (sent) dmSent++;
         }

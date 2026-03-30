@@ -8,6 +8,7 @@
     "build": "tsc",
     "start": "node dist/index.js",
     "seed": "ts-node src/scripts/initialSeed.ts",
+    "seed:books": "ts-node src/scripts/initialSeed.ts --only=books",
     "backfill:library": "ts-node src/scripts/backfillLibraryActivity.ts",
     "backfill:books": "ts-node src/scripts/backfillLibraryBooks.ts",
     "embedRead": "ts-node src/scripts/embedRead.ts"

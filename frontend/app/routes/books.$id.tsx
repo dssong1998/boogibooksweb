@@ -7,6 +7,7 @@ import {
   deleteBook,
   getBook,
   getCommentsByBook,
+  getMe,
   type BookData,
   type CommentData,
   type CommentType,
@@ -56,6 +57,8 @@ export default function BookDetail() {
   const [book, setBook] = useState<BookData | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [showFullDescription, setShowFullDescription] = useState(false);
+  const [myUserId, setMyUserId] = useState<string | null>(null);
+  const [showOnlyMyComments, setShowOnlyMyComments] = useState(false);
 
   useEffect(() => {
     const token = localStorage.getItem("auth_token");
@@ -67,12 +70,14 @@ export default function BookDetail() {
     const loadBook = async () => {
       if (!bookId) return;
       try {
-        const [bookData, commentData] = await Promise.all([
+        const [bookData, commentData, me] = await Promise.all([
           getBook(bookId),
           getCommentsByBook(bookId),
+          getMe(),
         ]);
         setBook(bookData);
         setComments(Array.isArray(commentData) ? commentData : []);
+        setMyUserId(me?.id ?? null);
       } catch (error) {
         console.error("Failed to load book detail:", error);
       } finally {
@@ -134,6 +139,18 @@ export default function BookDetail() {
     book?.description && !showFullDescription && shouldTruncate
       ? book.description.slice(0, descriptionTruncateLength) + "..."
       : book?.description;
+
+  const visibleComments = comments
+    .filter((c) => {
+      if (!showOnlyMyComments) return true;
+      if (!myUserId) return false;
+      return c.userId === myUserId;
+    })
+    .slice()
+    .sort(
+      (a, b) =>
+        new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime(),
+    );
 
   if (isLoading) {
     return (
@@ -340,15 +357,26 @@ export default function BookDetail() {
 
             {/* Comments List */}
             <div className="space-y-4">
-              <h2 className="text-xl font-bold text-gray-900 dark:text-white">
-                코멘트 ({comments.length})
-              </h2>
-              {comments.length === 0 ? (
+              <div className="flex items-center justify-between gap-3">
+                <h2 className="text-xl font-bold text-gray-900 dark:text-white">
+                  코멘트 ({visibleComments.length})
+                </h2>
+                <label className="flex items-center gap-2 text-sm text-gray-700 dark:text-gray-300 select-none">
+                  <input
+                    type="checkbox"
+                    checked={showOnlyMyComments}
+                    onChange={(e) => setShowOnlyMyComments(e.target.checked)}
+                    className="h-4 w-4 rounded border-gray-300 text-emerald-600 focus:ring-emerald-500"
+                  />
+                  내 코멘트만
+                </label>
+              </div>
+              {visibleComments.length === 0 ? (
                 <div className="text-center py-8 text-gray-500 dark:text-gray-400">
                   아직 코멘트가 없습니다. 첫 코멘트를 남겨보세요!
                 </div>
               ) : (
-                comments.map((comment) => {
+                visibleComments.map((comment) => {
                   const displayName = comment.user?.username || "익명";
                   const commentType = (comment.type as CommentType) || "REVIEW";
                   const typeConfig = commentTypeConfig[commentType];
