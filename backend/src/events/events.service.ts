@@ -6,6 +6,7 @@ import {
 import { CreateEventDto } from './dto/create-event.dto';
 import { UpdateEventDto } from './dto/update-event.dto';
 import { PrismaService } from '../prisma/prisma.service';
+import { LibraryActivityService } from '../library/library-activity.service';
 
 interface DiscordMessage {
   id: string;
@@ -26,7 +27,10 @@ interface DiscordDMChannel {
 
 @Injectable()
 export class EventsService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly libraryActivity: LibraryActivityService,
+  ) {}
 
   async create(createEventDto: CreateEventDto) {
     // eslint-disable-next-line @typescript-eslint/no-unsafe-return, @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access
@@ -85,6 +89,15 @@ export class EventsService {
   async checkLibraryActivity(
     discordUserId: string,
   ): Promise<{ hasActivity: boolean; messageCount: number }> {
+    const snapshot =
+      await this.libraryActivity.getCurrentMonthSnapshot(discordUserId);
+    if (snapshot?.hasActivity) {
+      return {
+        hasActivity: true,
+        messageCount: snapshot.messageCount,
+      };
+    }
+
     const botToken = process.env.DISCORD_BOT_TOKEN;
     const libraryChannelId = process.env.DISCORD_LIBRARY_CHANNEL_ID;
     const guildId = process.env.DISCORD_GUILD_ID;

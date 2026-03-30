@@ -191,6 +191,7 @@ export class AuthService {
           role,
           isTerras: hasTerrasRole,
           coins: initialCoins,
+          isNewMember: true,
         },
       });
       // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment

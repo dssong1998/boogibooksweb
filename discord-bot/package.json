@@ -8,6 +8,7 @@
     "build": "tsc",
     "start": "node dist/index.js",
     "seed": "ts-node src/scripts/initialSeed.ts",
+    "backfill:library": "ts-node src/scripts/backfillLibraryActivity.ts",
     "embedRead": "ts-node src/scripts/embedRead.ts"
   },
   "keywords": ["discord", "bot", "boogibooks"],

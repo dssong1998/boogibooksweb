@@ -181,3 +181,25 @@ enum UserRole {
   ADMIN
 }
 // 테라스 멤버 여부는 User.isTerras 필드로 관리
+
+// 디스코드 봇이 서재(포럼) 활동을 푸시할 때 집계 (이벤트 자격 등)
+model LibraryActivityMonth {
+  id            String   @id @default(uuid())
+  discordUserId String
+  year          Int
+  month         Int
+  messageCount  Int      @default(0)
+  hasActivity   Boolean  @default(false)
+  updatedAt     DateTime @updatedAt
+
+  @@unique([discordUserId, year, month])
+  @@index([discordUserId])
+}
+
+// 동일 Discord 이벤트(메시지/스레드) 중복 반영 방지
+model LibraryActivityAck {
+  id            String   @id @default(uuid())
+  sourceId      String   @unique
+  discordUserId String
+  createdAt     DateTime @default(now())
+}

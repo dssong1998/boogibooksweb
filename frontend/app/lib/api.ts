@@ -370,12 +370,18 @@ export function getEventApplications(eventId: string) {
 export function approveEventApplications(
   eventId: string,
   applicationIds: string[],
+  options?: { finalizeApproval?: boolean },
 ) {
   return fetchAPI<{
     approved: number;
     coinRefunded: { userId: string; coins: number; discordId: string }[];
     dmSent: number;
-  }>(`/events/${eventId}/approve`, 'POST', { applicationIds });
+    autoApprovedCoinUsers?: number;
+    rejectedCount?: number;
+  }>(`/events/${eventId}/approve`, 'POST', {
+    applicationIds,
+    finalizeApproval: options?.finalizeApproval ?? false,
+  });
 }
 
 // Admin: Monthly Book

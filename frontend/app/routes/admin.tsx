@@ -46,6 +46,7 @@ export default function Admin() {
   const [loadingApplications, setLoadingApplications] = useState(false);
   const [selectedApplications, setSelectedApplications] = useState<Set<string>>(new Set());
   const [isApproving, setIsApproving] = useState(false);
+  const [isFinalizing, setIsFinalizing] = useState(false);
 
   useEffect(() => {
     const token = localStorage.getItem("auth_token");
@@ -182,7 +183,7 @@ export default function Admin() {
     try {
       const result = await approveEventApplications(
         selectedEventId,
-        Array.from(selectedApplications)
+        Array.from(selectedApplications),
       );
       
       let message = `${result.approved}명이 승인되었습니다.`;
@@ -204,6 +205,49 @@ export default function Admin() {
       alert("승인에 실패했습니다.");
     } finally {
       setIsApproving(false);
+    }
+  };
+
+  const handleFinalizeApproval = async () => {
+    if (!selectedEventId) return;
+
+    const pendingOrCoin = applications.filter(
+      (a) => a.status === "PENDING" || a.status === "COIN_GUARANTEED",
+    );
+    if (pendingOrCoin.length === 0) {
+      alert("승인 대기 또는 코인 보장 상태인 신청자가 없습니다.");
+      return;
+    }
+
+    if (
+      !confirm(
+        `신청을 마감합니다.\n\n승인 대기·코인 보장 중인 ${pendingOrCoin.length}명에게 거절 안내 DM이 전송되고, 코인 사용 신청은 코인이 환불됩니다.\n\n계속하시겠습니까?`,
+      )
+    ) {
+      return;
+    }
+
+    setIsFinalizing(true);
+    try {
+      const result = await approveEventApplications(selectedEventId, [], {
+        finalizeApproval: true,
+      });
+      let message = "신청 마감 처리가 완료되었습니다.";
+      if (result.rejectedCount != null && result.rejectedCount > 0) {
+        message += `\n\n거절 안내 DM: ${result.rejectedCount}명`;
+      }
+      if (result.coinRefunded?.length) {
+        message += `\n\n코인 환불: ${result.coinRefunded.length}명`;
+      }
+      alert(message);
+      const data = await getEventApplications(selectedEventId);
+      setApplications(data);
+      setSelectedApplications(new Set());
+    } catch (error) {
+      console.error("Failed to finalize approval:", error);
+      alert("신청 마감 처리에 실패했습니다.");
+    } finally {
+      setIsFinalizing(false);
     }
   };
 
@@ -594,6 +638,30 @@ export default function Admin() {
               </div>
             )}
 
+            {applications.some(
+              (a) => a.status === "PENDING" || a.status === "COIN_GUARANTEED",
+            ) && (
+              <div className="px-6 py-3 bg-amber-50 dark:bg-amber-900/20 border-b border-amber-100 dark:border-amber-800 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+                <div>
+                  <p className="text-sm font-medium text-amber-900 dark:text-amber-200">
+                    신청 마감
+                  </p>
+                  <p className="text-xs text-amber-800/90 dark:text-amber-300/90 mt-0.5">
+                    승인 대기·코인 보장 중인 신청자에게 거절 안내 DM을 보내고 모집을
+                    종료합니다.
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={handleFinalizeApproval}
+                  disabled={isFinalizing || isApproving}
+                  className="shrink-0 px-4 py-2 bg-amber-600 text-white rounded-lg hover:bg-amber-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors text-sm font-medium"
+                >
+                  {isFinalizing ? "처리 중..." : "신청 마감 (미승인자 거절)"}
+                </button>
+              </div>
+            )}
+
             <div className="p-6 overflow-y-auto max-h-[55vh]">
               {loadingApplications ? (
                 <div className="text-center py-8">
@@ -698,8 +766,9 @@ export default function Admin() {
                   승인대기 {applications.filter(a => a.status === "PENDING").length}명 · 
                   확정 {applications.filter(a => a.status === "CONFIRMED" || a.status === "COIN_GUARANTEED").length}명
                 </span>
-                <span className="text-xs">
-                  ※ 승인 시 Discord DM으로 결제 안내가 전송됩니다
+                <span className="text-xs text-right max-w-xs">
+                  ※ 승인 시 결제 안내 DM이 전송됩니다. 모집 종료는 위「신청
+                  마감」버튼을 사용하세요.
                 </span>
               </div>
             </div>
