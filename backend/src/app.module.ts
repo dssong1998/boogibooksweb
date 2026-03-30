@@ -11,10 +11,12 @@ import { DiggingModule } from './digging/digging.module';
 import { AdminController } from './admin/admin.controller';
 import { SeedModule } from './seed/seed.module';
 import { TableLogsModule } from './table-logs/table-logs.module';
+import { LibraryModule } from './library/library.module';
 
 @Module({
   imports: [
     PrismaModule,
+    LibraryModule,
     EventsModule,
     AuthModule,
     UsersModule,
