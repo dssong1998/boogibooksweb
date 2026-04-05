@@ -10,9 +10,7 @@ COPY package*.json ./
 RUN npm ci
 
 # Prisma 스키마·설정 복사 및 클라이언트 생성
-COPY prisma.config.ts ./
 COPY prisma ./prisma/
-RUN npx prisma db push
 
 # 소스 복사 및 빌드
 COPY . .
@@ -37,4 +35,4 @@ ENV NODE_ENV=production
 EXPOSE 3000
 
 # 시작 시 적용 대기 중인 마이그레이션만 반영 (프로덕션 표준 — db push / --accept-data-loss 사용 금지)
-CMD ["sh", "-c", "npx prisma migrate deploy && node dist/src/main.js"]
+CMD ["sh", "-c", "npx prisma db push --accept-data-loss --url \"$DATABASE_URL\" && node dist/src/main.js"]
