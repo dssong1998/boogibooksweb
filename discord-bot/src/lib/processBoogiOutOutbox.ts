@@ -14,6 +14,22 @@ const LIVING_ROOM_ID =
   process.env.DISCORD_LIVING_ROOM_CHANNEL_ID ||
   '';
 
+/** 백엔드에서 온 ISO(UTC) 일시 → 한국 시간, 예: 2026년 4월 2일 수요일 19:30 */
+function formatBoogiOutEventDateKorea(raw: string): string {
+  const d = new Date(raw);
+  if (Number.isNaN(d.getTime())) return raw;
+  return new Intl.DateTimeFormat('ko-KR', {
+    timeZone: 'Asia/Seoul',
+    year: 'numeric',
+    month: 'long',
+    day: 'numeric',
+    weekday: 'long',
+    hour: '2-digit',
+    minute: '2-digit',
+    hourCycle: 'h23',
+  }).format(d);
+}
+
 export async function processBoogiOutOutboxOnce(client: Client): Promise<void> {
   if (!BOT_SECRET) {
     console.warn('BOT_INTERNAL_SECRET 미설정 — 스킵');
@@ -111,8 +127,12 @@ async function handleCreatePromo(
   const title = String(p.title ?? '부깃아웃');
   const description = String(p.description ?? '');
   const location = String(p.location ?? '');
-  const eventDate = p.eventDate
-    ? String(p.eventDate)
+  const eventDateRaw =
+    p.eventDate != null && String(p.eventDate).trim() !== ''
+      ? String(p.eventDate)
+      : '';
+  const eventDate = eventDateRaw
+    ? formatBoogiOutEventDateKorea(eventDateRaw)
     : '일정: 미정 (함께 조율)';
   const frontendUrl = String(p.frontendUrl ?? '');
   const eventId = String(p.eventId ?? '');
