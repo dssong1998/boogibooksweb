@@ -17,6 +17,7 @@ import {
   isValidLibraryMessage,
 } from './lib/libraryActivity';
 import { pushLibraryActivityToBackend } from './lib/pushLibraryActivity';
+import { processBoogiOutOutboxOnce } from './lib/processBoogiOutOutbox';
 import axios from 'axios';
 
 dotenv.config();
@@ -59,6 +60,12 @@ client.once(Events.ClientReady, async (c) => {
       console.error('❌ 음성 채널 초기화 실패:', error);
     }
   }
+
+  console.log('processBoogiOutOutboxOnce');
+  await processBoogiOutOutboxOnce(c);
+  setInterval(async () => {
+    await processBoogiOutOutboxOnce(c);
+  }, 45_000);
 });
 
 function getChannelName(channel: Message['channel']): string | null {
@@ -232,8 +239,12 @@ client.on(Events.MessageCreate, async (message: Message) => {
       const adminUser = await client.users.fetch(ADMIN_ID1);
       const lines: string[] = [];
       lines.push('📩 **새 DM 수신**');
-      lines.push(`- from: **${message.author.username}** (\`${message.author.id}\`)`);
-      lines.push(`- at: ${new Date(message.createdTimestamp).toLocaleString('ko-KR')}`);
+      lines.push(
+        `- from: **${message.author.username}** (\`${message.author.id}\`)`,
+      );
+      lines.push(
+        `- at: ${new Date(message.createdTimestamp).toLocaleString('ko-KR')}`,
+      );
       if (message.content?.trim()) {
         lines.push('');
         lines.push(message.content);

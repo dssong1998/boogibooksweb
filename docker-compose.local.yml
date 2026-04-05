@@ -1,0 +1,26 @@
+# 로컬 개발용 PostgreSQL만 실행 (호스트 5433 → 컨테이너 5432, 기본 5432와 충돌 방지)
+# 사용: docker compose -f docker-compose.local.yml up -d
+# 중지: docker compose -f docker-compose.local.yml down
+
+name: boogibooks-local
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: boogibooks-postgres-local
+    ports:
+      - '5433:5432'
+    environment:
+      POSTGRES_USER: boogibooks
+      POSTGRES_PASSWORD: boogibooks_local_dev
+      POSTGRES_DB: boogibooks
+    volumes:
+      - boogibooks_local_pg:/var/lib/postgresql/data
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U boogibooks']
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+volumes:
+  boogibooks_local_pg:

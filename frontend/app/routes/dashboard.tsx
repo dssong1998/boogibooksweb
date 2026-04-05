@@ -246,6 +246,15 @@ export default function Dashboard() {
               부기북스
             </h1>
             <div className='flex items-center space-x-4'>
+              {user?.role !== 'VISITOR' && (
+                <button
+                  type='button'
+                  onClick={() => navigate('/boogi-out')}
+                  className='px-4 py-2 text-sm bg-teal-100 text-teal-800 dark:bg-teal-900/30 dark:text-teal-300 rounded-lg hover:bg-teal-200 dark:hover:bg-teal-900/50 font-medium'
+                >
+                  부깃아웃
+                </button>
+              )}
               {user?.role === 'ADMIN' && (
                 <button
                   onClick={() => navigate('/admin')}

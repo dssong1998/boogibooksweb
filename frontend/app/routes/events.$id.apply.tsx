@@ -111,11 +111,11 @@ export default function EventApply() {
           alert('🎉 ' + result.message);
           navigate(
             '/payment?eventId=' +
-              eventId +
-              '&applicationOrder=' +
-              result.applicationOrder +
+              encodeURIComponent(eventId) +
+              '&paymentKind=EVENT&amount=' +
+              encodeURIComponent(String(eventPrice)) +
               '&userId=' +
-              user?.id,
+              encodeURIComponent(user?.id ?? ''),
           );
           return;
         }

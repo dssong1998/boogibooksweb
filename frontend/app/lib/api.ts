@@ -45,7 +45,17 @@ async function fetchAPI<T>(
   }
 
   if (!response.ok) {
-    throw new Error(`API Error: ${response.status} ${response.statusText}`);
+    let msg = `API Error: ${response.status} ${response.statusText}`;
+    try {
+      const errText = await response.text();
+      const j = JSON.parse(errText) as { message?: string | string[] };
+      if (j.message) {
+        msg = Array.isArray(j.message) ? j.message.join(', ') : String(j.message);
+      }
+    } catch {
+      /* keep msg */
+    }
+    throw new Error(msg);
   }
 
   if (response.status === 204) {
@@ -208,6 +218,23 @@ export function confirmEventPayment(eventId: string, userId?: string) {
     'POST',
     userId ? { userId } : undefined,
   );
+}
+
+export type PaymentKindParam = 'EVENT' | 'BOOGI_OUT';
+
+export interface PaymentTarget {
+  paymentKind: PaymentKindParam;
+  title: string;
+  amount: number;
+  eventType?: string;
+  settlementMode?: string;
+  commissionBankName?: string | null;
+  commissionAccountNumber?: string | null;
+}
+
+export function getPaymentTarget(eventId: string, paymentKind: PaymentKindParam) {
+  const q = new URLSearchParams({ eventId, paymentKind });
+  return fetchAPI<PaymentTarget>(`/payments/target?${q.toString()}`);
 }
 
 // 사용자 정보 조회 (공개 API - 토큰 불필요)
@@ -559,6 +586,238 @@ export function getPublicDiggings(page = 1, limit = 20, hashtag?: string) {
   return fetchAPI<DiggingPublicResponse>(
     `/digging/public?${params.toString()}`,
   );
+}
+
+// ——— BoogiOut (부깃아웃) ———
+export type BoogiOutCostMode = 'TOTAL' | 'PER_PERSON';
+export type BoogiOutSettlementMode = 'COMMISSION' | 'COIN_GAIN';
+export type BoogiOutTimeMode = 'CONFIRMED' | 'SET_TOGETHER';
+export type BoogiOutEventStatus =
+  | 'STANDBY'
+  | 'IN_PROGRESS'
+  | 'CLOSED_REGISTRATION'
+  | 'COMPLETED'
+  | 'CANCELLED';
+
+export interface BoogiOutListItem {
+  id: string;
+  title: string;
+  description: string;
+  location: string;
+  status: BoogiOutEventStatus;
+  timeMode: BoogiOutTimeMode;
+  eventDate: string | null;
+  promotionalImageUrl: string | null;
+  createdAt: string;
+  creator: { id: string; username: string };
+  _count: { applications: number };
+}
+
+export interface BoogiOutDetail extends BoogiOutListItem {
+  expectedPrice: number;
+  demandParticipants: number;
+  viewerIsPlanner: boolean;
+  /** 기획자·관리자 전용: 취소 제외 현재 신청 수(planner expectedPrice 산정에 사용) */
+  activeApplicantCount?: number;
+  maxParticipants: number | null;
+  targetHeadcount: number | null;
+  dateSelectionMockupUrl: string | null;
+  applicantResponseEnabled: boolean;
+  applicantResponseLabel: string | null;
+  afterPartyEnabled: boolean;
+  afterPartyBudgetPerPerson: number | null;
+  reminder3dAt: string | null;
+  registrationClosesAt: string | null;
+  registrationClosedAt?: string | null;
+  /** 기획자·관리자에게만 포함 */
+  costMode?: BoogiOutCostMode;
+  costAmount?: number;
+  feePercent?: number;
+  settlementMode?: BoogiOutSettlementMode;
+  commissionBankName?: string | null;
+  commissionAccountNumber?: string | null;
+  paymentLink?: string | null;
+  afterPartyTotalAmount?: number | null;
+  afterPartyBankName?: string | null;
+  afterPartyAccountNumber?: string | null;
+  afterPartySettledAt?: string | null;
+}
+
+export interface BoogiOutApplicationRow {
+  id: string;
+  userId: string;
+  responseText: string | null;
+  afterPartyOptIn: boolean | null;
+  status: string;
+  proofToken: string;
+  paidAt: string | null;
+  createdAt: string;
+  user: { id: string; username: string };
+}
+
+export function getBoogiOutList() {
+  return fetchAPI<BoogiOutListItem[]>('/boogi-out');
+}
+
+export interface BoogiOutCertificateRow {
+  eventId: string;
+  eventTitle: string;
+  location: string;
+  eventDate: string | null;
+  proofToken: string;
+  paidAt: string | null;
+  eventStatus: string;
+}
+
+export function getMyBoogiOutCertificates() {
+  return fetchAPI<BoogiOutCertificateRow[]>('/boogi-out/my-certificates');
+}
+
+export function getBoogiOut(id: string) {
+  return fetchAPI<BoogiOutDetail>(`/boogi-out/${id}`);
+}
+
+/** 멀티파트 업로드 — 반환 url을 create 시 promotionalImageUrl로 사용 */
+export async function uploadBoogiOutPromoImage(
+  file: File,
+): Promise<{ url: string }> {
+  const token = localStorage.getItem('auth_token');
+  const form = new FormData();
+  form.append('file', file);
+  const res = await fetch(`${API_BASE_URL}/boogi-out/upload-image`, {
+    method: 'POST',
+    headers: token ? { Authorization: `Bearer ${token}` } : {},
+    body: form,
+  });
+  if (res.status === 401) {
+    handleTokenExpired();
+    throw new Error('Token expired');
+  }
+  if (!res.ok) {
+    let msg = `업로드 실패 (${res.status})`;
+    try {
+      const text = await res.text();
+      const j = JSON.parse(text) as { message?: string | string[] };
+      if (j.message) {
+        msg = Array.isArray(j.message) ? j.message.join(', ') : String(j.message);
+      }
+    } catch {
+      /* keep default */
+    }
+    throw new Error(msg);
+  }
+  return res.json() as Promise<{ url: string }>;
+}
+
+export function createBoogiOut(payload: {
+  title: string;
+  description: string;
+  location: string;
+  costMode: BoogiOutCostMode;
+  costAmount: number;
+  settlementMode: BoogiOutSettlementMode;
+  demandParticipants: number;
+  commissionBankName?: string;
+  commissionAccountNumber?: string;
+  maxParticipants?: number;
+  timeMode: BoogiOutTimeMode;
+  eventDate?: string;
+  targetHeadcount?: number;
+  dateSelectionMockupUrl?: string;
+  applicantResponseEnabled: boolean;
+  applicantResponseLabel?: string;
+  afterPartyEnabled: boolean;
+  afterPartyBudgetPerPerson?: number;
+  promotionalImageUrl?: string;
+}) {
+  return fetchAPI<BoogiOutDetail>('/boogi-out', 'POST', payload);
+}
+
+export function closeBoogiOutRegistrations(eventId: string) {
+  return fetchAPI<BoogiOutDetail>(
+    `/boogi-out/${eventId}/close-registrations`,
+    'POST',
+  );
+}
+
+export function cancelMyBoogiOutApplication(eventId: string) {
+  return fetchAPI<{ id: string; status: string }>(
+    `/boogi-out/${eventId}/my-application`,
+    'DELETE',
+  );
+}
+
+export function calculateBoogiOutPreview(params: {
+  costMode: BoogiOutCostMode;
+  costAmount: number;
+  participantCount: number;
+  feePercent?: number;
+}) {
+  const q = new URLSearchParams({
+    costMode: params.costMode,
+    costAmount: String(params.costAmount),
+    participantCount: String(params.participantCount),
+  });
+  if (params.feePercent != null) {
+    q.set('feePercent', String(params.feePercent));
+  }
+  return fetchAPI<{
+    feePercent: number;
+    perPerson: number;
+    perPersonIfTenApplicants: number;
+    totalWithFee: number;
+  }>(`/boogi-out/calculate-preview?${q.toString()}`);
+}
+
+export function applyBoogiOut(
+  eventId: string,
+  body: { responseText?: string; afterPartyOptIn?: boolean },
+) {
+  return fetchAPI<{ id: string }>(`/boogi-out/${eventId}/apply`, 'POST', body);
+}
+
+export function confirmBoogiOutDate(eventId: string, eventDate: string) {
+  return fetchAPI<BoogiOutDetail>(`/boogi-out/${eventId}/confirm-date`, 'POST', {
+    eventDate,
+  });
+}
+
+export function settleBoogiOutAfterParty(
+  eventId: string,
+  body: { totalAmount: number; bankName: string; accountNumber: string },
+) {
+  return fetchAPI<{ each: number; recipientCount: number }>(
+    `/boogi-out/${eventId}/after-party`,
+    'PATCH',
+    body,
+  );
+}
+
+export function confirmBoogiOutPayment(eventId: string) {
+  return fetchAPI<{ id: string }>(`/boogi-out/${eventId}/confirm-payment`, 'POST');
+}
+
+export function getMyBoogiOutApplication(eventId: string) {
+  return fetchAPI<BoogiOutApplicationRow | null>(`/boogi-out/${eventId}/me`);
+}
+
+export function getBoogiOutApplicationsForPlanner(eventId: string) {
+  return fetchAPI<BoogiOutApplicationRow[]>(`/boogi-out/${eventId}/applications`);
+}
+
+export async function getBoogiOutProofPublic(eventId: string, token: string) {
+  const url = `${API_BASE_URL}/boogi-out/${eventId}/proof/${token}`;
+  const res = await fetch(url);
+  if (!res.ok) {
+    throw new Error(`증명 페이지를 불러올 수 없습니다 (${res.status})`);
+  }
+  return res.json() as Promise<{
+    eventTitle: string;
+    location: string;
+    eventDate: string | null;
+    username: string;
+    paidAt: string | null;
+  }>;
 }
 
 // 날짜+시간 포맷 유틸리티 (한국 시간대)

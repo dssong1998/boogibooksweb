@@ -12,11 +12,17 @@ import { AdminController } from './admin/admin.controller';
 import { SeedModule } from './seed/seed.module';
 import { TableLogsModule } from './table-logs/table-logs.module';
 import { LibraryModule } from './library/library.module';
+import { BoogiOutModule } from './boogi-out/boogi-out.module';
+import { PaymentsModule } from './payments/payments.module';
+import { ScheduleModule } from '@nestjs/schedule';
 
 @Module({
   imports: [
+    ScheduleModule.forRoot(),
     PrismaModule,
     LibraryModule,
+    BoogiOutModule,
+    PaymentsModule,
     EventsModule,
     AuthModule,
     UsersModule,

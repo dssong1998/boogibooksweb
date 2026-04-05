@@ -251,8 +251,6 @@ export class EventsService {
     const isNewMember = user.isNewMember as boolean;
     const maxParticipants = event.maxParticipants as number;
     const discordId = user.discordId as string;
-    // applications 배열 길이로 현재 참가자 수 계산
-    const currentParticipants = (event.applications?.length ?? 0) as number;
     /* eslint-enable @typescript-eslint/no-unsafe-member-access */
 
     // VISITOR는 이벤트 신청 불가
@@ -279,7 +277,12 @@ export class EventsService {
         ? { hasActivity: true, messageCount: 0 }
         : await this.checkLibraryActivity(discordId);
 
-    const currentOrder = currentParticipants + 1;
+    const activeAppCount = (event.applications ?? []).filter(
+      /* eslint-disable @typescript-eslint/no-unsafe-member-access */
+      (a: { status: string }) => a.status !== 'CANCELLED',
+      /* eslint-enable @typescript-eslint/no-unsafe-member-access */
+    ).length;
+    const currentOrder = activeAppCount + 1;
     const isOverCapacity = currentOrder > maxParticipants;
 
     // VISITOR는 이벤트 신청 불가
@@ -298,15 +301,17 @@ export class EventsService {
       /* eslint-disable @typescript-eslint/no-unsafe-member-access */
       const existingStatus = existingApplication.status as string;
       /* eslint-enable @typescript-eslint/no-unsafe-member-access */
-      return {
-        eligible: false,
-        reason: '이미 이 이벤트에 신청하셨습니다.',
-        isFree,
-        isOverCapacity,
-        libraryMessageCount: libraryActivity.messageCount,
-        alreadyApplied: true,
-        existingStatus,
-      };
+      if (existingStatus !== 'CANCELLED') {
+        return {
+          eligible: false,
+          reason: '이미 이 이벤트에 신청하셨습니다.',
+          isFree,
+          isOverCapacity,
+          libraryMessageCount: libraryActivity.messageCount,
+          alreadyApplied: true,
+          existingStatus,
+        };
+      }
     }
 
     // 뉴멤버가 아닌 경우에만 서재 활동 체크
@@ -371,9 +376,9 @@ export class EventsService {
     const userCoins = user.coins as number;
     const requiredCoins = event.requiredCoins as number;
     const maxParticipants = event.maxParticipants as number;
-    // applications 배열 길이로 현재 참가자 수 계산
-    const currentParticipants = (event.applications?.length ?? 0) as number;
-    /* eslint-enable @typescript-eslint/no-unsafe-member-access */
+    const activeAppCount = (event.applications ?? []).filter(
+      (a: { status: string }) => a.status !== 'CANCELLED',
+    ).length;
 
     // VISITOR는 이벤트 신청 불가
     if (userRole === 'VISITOR') {
@@ -390,7 +395,11 @@ export class EventsService {
       where: { eventId_userId: { eventId, userId } },
     });
     /* eslint-enable @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access */
-    if (existingApplication) {
+    const isReapplyFromCancelled =
+      existingApplication &&
+      (existingApplication.status as string) === 'CANCELLED';
+
+    if (existingApplication && !isReapplyFromCancelled) {
       throw new BadRequestException('이미 이 이벤트에 신청하셨습니다.');
     }
 
@@ -408,7 +417,7 @@ export class EventsService {
       }
     }
 
-    const applicationOrder = currentParticipants + 1;
+    const applicationOrder = activeAppCount + 1;
     const isOverCapacity = applicationOrder > maxParticipants;
 
     let usedCoins = 0;
@@ -445,29 +454,32 @@ export class EventsService {
 
     const isOtherEvent = eventTypeApply === 'OTHER';
 
-    // 신청 생성 (서재 활동 수, 뉴멤버 여부 기록)
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access
-    await (this.prisma as any).eventApplication.create({
-      data: {
-        event: {
-          connect: {
-            id: eventId,
-          },
+    const applicationPayload = {
+      applicationOrder,
+      status,
+      usedCoins,
+      libraryMessageCount: libraryActivity.messageCount,
+      isNewMember,
+      paidAt: isOtherEvent ? null : isNewMember ? new Date() : null,
+      approvedAt: isOtherEvent || isNewMember ? new Date() : null,
+    };
+
+    if (isReapplyFromCancelled) {
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access
+      await (this.prisma as any).eventApplication.update({
+        where: { id: (existingApplication as { id: string }).id },
+        data: applicationPayload,
+      });
+    } else {
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access
+      await (this.prisma as any).eventApplication.create({
+        data: {
+          event: { connect: { id: eventId } },
+          user: { connect: { id: userId } },
+          ...applicationPayload,
         },
-        user: {
-          connect: {
-            id: userId,
-          },
-        },
-        applicationOrder,
-        status,
-        usedCoins,
-        libraryMessageCount: libraryActivity.messageCount,
-        isNewMember, // 신청 시점의 뉴멤버 여부 기록
-        paidAt: isOtherEvent ? null : isNewMember ? new Date() : null,
-        approvedAt: isOtherEvent || isNewMember ? new Date() : null,
-      },
-    });
+      });
+    }
 
     // OTHER: 선착순 자동 승인 → 결제 안내 DM 전송 (테라스/뉴멤버 동일)
     if (isOtherEvent) {
@@ -481,7 +493,6 @@ export class EventsService {
         eventId,
         eventTitle,
         eventPrice,
-        applicationOrder,
         false,
         0,
       );
@@ -587,7 +598,6 @@ export class EventsService {
     const paymentUsers: {
       userId: string;
       discordId: string;
-      applicationOrder: number;
     }[] = [];
 
     for (const appId of applicationIds) {
@@ -610,7 +620,6 @@ export class EventsService {
       const userDiscordId = application.user.discordId as string;
       const userIsTerras = application.user.isTerras as boolean;
       const appIsNewMember = application.isNewMember as boolean; // 신청 시점의 뉴멤버 여부
-      const appOrder = application.applicationOrder as number;
 
       // 코인 사용자가 승인되면 코인 반환 + 이달의 멤버 선정
       if (usedCoins > 0) {
@@ -659,7 +668,6 @@ export class EventsService {
         paymentUsers.push({
           userId: appUserId,
           discordId: userDiscordId,
-          applicationOrder: appOrder,
         });
       }
       // 테라스 멤버 또는 뉴멤버: CONFIRMED + 참석 확정 DM (무료)
@@ -693,7 +701,6 @@ export class EventsService {
         paymentUsers.push({
           userId: appUserId,
           discordId: userDiscordId,
-          applicationOrder: appOrder,
         });
       }
       /* eslint-enable @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access */
@@ -724,7 +731,6 @@ export class EventsService {
         eventId,
         eventTitle,
         eventPrice,
-        user.applicationOrder,
         false,
         0,
       );
@@ -804,7 +810,6 @@ export class EventsService {
     for (const app of pendingApplications as any[]) {
       const appId = app.id as string;
       const appUserId = app.userId as string;
-      const appOrder = app.applicationOrder as number;
       const usedCoins = (app.usedCoins as number) || 0;
       const appIsNewMember = app.isNewMember as boolean;
 
@@ -864,7 +869,6 @@ export class EventsService {
             input.eventId,
             input.eventTitle,
             input.eventPrice,
-            appOrder,
             false,
             0,
           );
@@ -1277,7 +1281,6 @@ export class EventsService {
     eventId: string,
     eventTitle: string,
     price: number,
-    applicationOrder: number,
     isCoinRefunded: boolean = false,
     refundedCoins: number = 0,
   ) {
@@ -1315,7 +1318,7 @@ export class EventsService {
       description,
       color: isCoinRefunded ? 0xffd700 : 0x7c9070, // 코인 반환 시 골드 색상
       fields,
-      url: `${process.env.FRONTEND_URL || 'https://boogibooks.com'}/payment?eventId=${eventId}&applicationOrder=${applicationOrder}&userId=${userId}`,
+      url: `${process.env.FRONTEND_URL || 'https://boogibooks.com'}/payment?eventId=${encodeURIComponent(eventId)}&paymentKind=EVENT&amount=${price}${userId ? `&userId=${encodeURIComponent(userId)}` : ''}`,
     });
   }
 }

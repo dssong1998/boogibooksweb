@@ -75,8 +75,147 @@ model User {
   comments              Comment[]
   diggings              Digging[]
   eventApplications     EventApplication[]
+  boogiOutEventsCreated BoogiOutEvent[]
+  boogiOutApplications  BoogiOutApplication[]
   createdAt             DateTime  @default(now())
   updatedAt             DateTime  @updatedAt
+}
+
+// 부깃아웃(BoogiOut) — 커뮤니티 기획 모임 (기존 Event 모델과 별도)
+model BoogiOutEvent {
+  id          String @id @default(uuid())
+  creatorId   String
+  creator     User   @relation(fields: [creatorId], references: [id], onDelete: Cascade)
+
+  title       String
+  description String @db.Text
+  location    String
+
+  costMode         BoogiOutCostMode
+  costAmount       Int // TOTAL: 총 비용(원), PER_PERSON: 1인당 비용(원)
+  feePercent       Int                  @default(10)
+  settlementMode   BoogiOutSettlementMode
+  /** 예상 가격(신청자 노출) = 총액 모드: costAmount/demandParticipants, 1인당 모드: costAmount */
+  demandParticipants Int                @default(1)
+  /** settlementMode COMMISSION(현금성 정산) 시 입금 안내용 */
+  commissionBankName       String?
+  commissionAccountNumber  String?
+  maxParticipants  Int?
+
+  timeMode               BoogiOutTimeMode
+  eventDate              DateTime?
+  targetHeadcount        Int?
+  dateSelectionMockupUrl String?
+
+  applicantResponseEnabled Boolean @default(false)
+  applicantResponseLabel   String?
+
+  afterPartyEnabled         Boolean @default(false)
+  afterPartyBudgetPerPerson Int?
+  afterPartyTotalAmount     Int?
+  afterPartyBankName        String?
+  afterPartyAccountNumber   String?
+  afterPartySettledAt       DateTime?
+
+  promotionalImageUrl String?
+  paymentLink         String?
+
+  status BoogiOutEventStatus
+
+  reminder3dAt         DateTime?
+  registrationClosesAt DateTime?
+  reminder3dSentAt     DateTime?
+  registrationClosedAt DateTime?
+  postCloseDmSentAt    DateTime?
+
+  headcountReachedNotifiedAt DateTime?
+
+  discordPromoMessageId String?
+  discordThreadId       String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  applications BoogiOutApplication[]
+  outbox       BoogiOutDiscordOutbox[]
+}
+
+enum BoogiOutCostMode {
+  TOTAL
+  PER_PERSON
+}
+
+enum BoogiOutSettlementMode {
+  COMMISSION
+  COIN_GAIN
+}
+
+enum BoogiOutTimeMode {
+  CONFIRMED
+  SET_TOGETHER
+}
+
+enum BoogiOutEventStatus {
+  STANDBY
+  IN_PROGRESS
+  CLOSED_REGISTRATION
+  COMPLETED
+  CANCELLED
+}
+
+model BoogiOutApplication {
+  id       String @id @default(uuid())
+  eventId  String
+  event    BoogiOutEvent @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  userId   String
+  user     User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  responseText String?
+  /** 뒷풀이 ON일 때만: true/false. 뒷풀이 OFF 이벤트는 null */
+  afterPartyOptIn Boolean?
+
+  status BoogiOutApplicationStatus @default(PENDING)
+  proofToken String @unique @default(uuid())
+  paidAt     DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([eventId, userId])
+}
+
+enum BoogiOutApplicationStatus {
+  PENDING
+  AWAITING_PAYMENT
+  PAID
+  CANCELLED
+}
+
+model BoogiOutDiscordOutbox {
+  id      String @id @default(uuid())
+  kind    String
+  payload Json
+  status  String  @default("PENDING")
+  error   String?
+
+  eventId String?
+  event   BoogiOutEvent? @relation(fields: [eventId], references: [id], onDelete: SetNull)
+
+  createdAt   DateTime  @default(now())
+  processedAt DateTime?
+}
+enum BoogiOutDiscordOutboxKind {
+  CREATE_PROMO
+  NEW_APPLICATION_PLANNER_DM
+  STANDBY_HEADCOUNT_MET
+  REMINDER_3D_CHANNEL
+  POST_CLOSE_DM
+  AFTER_PARTY_SPLIT
+  CREATE_ATTENDANCE_THREAD
+}
+enum BoogiOutDiscordOutboxStatus {
+  PENDING
+  DONE
+  FAILED
 }
 
 model Book {
