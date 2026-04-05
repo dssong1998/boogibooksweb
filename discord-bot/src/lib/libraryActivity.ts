@@ -21,6 +21,6 @@ export function isValidLibraryMessage(content: string | undefined): boolean {
 
 export function getLibraryParentChannelId(): string | undefined {
   return (
-    process.env.DISCORD_LIBRARY_CHANNEL_ID || process.env.BOOKS_CHANNEL_ID
+    process.env.LIBRARY_CHANNEL_ID || process.env.BOOKS_CHANNEL_ID
   )?.trim() || undefined;
 }

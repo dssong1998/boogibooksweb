@@ -29,7 +29,8 @@ const BOT_TOKEN = process.env.DISCORD_BOT_TOKEN;
 const GUILD_ID = process.env.DISCORD_GUILD_ID;
 
 // 채널 ID들 (환경변수 또는 직접 지정)
-const LIBRARY_CHANNEL_ID = process.env.BOOKS_CHANNEL_ID || '';
+const LIBRARY_CHANNEL_ID =
+  process.env.LIBRARY_CHANNEL_ID || process.env.BOOKS_CHANNEL_ID || '';
 const DIGGING_CHANNEL_ID = process.env.DIGGING_CHANNEL_ID || '';
 const TABLE_LOG_CHANNEL_ID = process.env.TABLE_LOG_CHANNEL_ID || '';
 

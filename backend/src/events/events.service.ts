@@ -99,7 +99,7 @@ export class EventsService {
     }
 
     const botToken = process.env.DISCORD_BOT_TOKEN;
-    const libraryChannelId = process.env.DISCORD_LIBRARY_CHANNEL_ID;
+    const libraryChannelId = process.env.LIBRARY_CHANNEL_ID;
     const guildId = process.env.DISCORD_GUILD_ID;
 
     if (!botToken || !libraryChannelId) {

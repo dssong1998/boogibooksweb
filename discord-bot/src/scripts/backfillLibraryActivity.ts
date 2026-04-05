@@ -14,7 +14,7 @@
  * 필요 env:
  * - DISCORD_BOT_TOKEN
  * - DISCORD_GUILD_ID
- * - DISCORD_LIBRARY_CHANNEL_ID (서재 포럼 채널 ID)  또는 BOOKS_CHANNEL_ID
+ * - LIBRARY_CHANNEL_ID (서재 포럼 채널 ID) 또는 BOOKS_CHANNEL_ID
  * - BACKEND_API_URL (예: http://localhost:3000 또는 http://backend:3000)
  * - BOT_INTERNAL_SECRET (백엔드와 공유)
  */
@@ -106,7 +106,7 @@ async function main() {
 
   const libraryParentId = getLibraryParentChannelId();
   if (!libraryParentId)
-    throw new Error('DISCORD_LIBRARY_CHANNEL_ID 또는 BOOKS_CHANNEL_ID 미설정');
+    throw new Error('LIBRARY_CHANNEL_ID 또는 BOOKS_CHANNEL_ID 미설정');
 
   const client = new Client({
     intents: [

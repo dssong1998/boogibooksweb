@@ -12,7 +12,7 @@
  * 필요 env:
  * - DISCORD_BOT_TOKEN
  * - DISCORD_GUILD_ID
- * - DISCORD_LIBRARY_CHANNEL_ID (없으면 BOOKS_CHANNEL_ID 사용)
+ * - LIBRARY_CHANNEL_ID (없으면 BOOKS_CHANNEL_ID 사용)
  * - BACKEND_API_URL
  */
 
@@ -150,7 +150,7 @@ async function main() {
   if (!GUILD_ID) throw new Error('DISCORD_GUILD_ID 미설정');
 
   const libraryParentId = getLibraryParentChannelId();
-  if (!libraryParentId) throw new Error('DISCORD_LIBRARY_CHANNEL_ID 또는 BOOKS_CHANNEL_ID 미설정');
+  if (!libraryParentId) throw new Error('LIBRARY_CHANNEL_ID 또는 BOOKS_CHANNEL_ID 미설정');
 
   const client = new Client({
     intents: [
