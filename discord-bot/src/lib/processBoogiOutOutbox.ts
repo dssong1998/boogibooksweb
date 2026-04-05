@@ -9,7 +9,10 @@ import {
 dotenv.config();
 const BACKEND_URL = process.env.BACKEND_API_URL || 'http://localhost:3000';
 const BOT_SECRET = process.env.BOT_INTERNAL_SECRET || '';
-const LIVING_ROOM_ID = process.env.LIVING_ROOM_CHANNEL_ID || '';
+const LIVING_ROOM_ID =
+  process.env.LIVING_ROOM_CHANNEL_ID ||
+  process.env.DISCORD_LIVING_ROOM_CHANNEL_ID ||
+  '';
 
 export async function processBoogiOutOutboxOnce(client: Client): Promise<void> {
   if (!BOT_SECRET) {
@@ -95,7 +98,7 @@ async function handleCreatePromo(
 ): Promise<void> {
   if (!LIVING_ROOM_ID) {
     console.warn(
-      '[boogi-out] DISCORD_LIVING_ROOM_CHANNEL_ID 미설정 — CREATE_PROMO 스킵',
+      '[boogi-out] LIVING_ROOM_CHANNEL_ID 미설정 — CREATE_PROMO 스킵',
     );
     return;
   }
@@ -305,7 +308,7 @@ async function handleAttendanceThread(
 ): Promise<void> {
   if (!LIVING_ROOM_ID) {
     console.warn(
-      '[boogi-out] DISCORD_LIVING_ROOM_CHANNEL_ID 미설정 — 스레드 스킵',
+      '[boogi-out] LIVING_ROOM_CHANNEL_ID 미설정 — 스레드 스킵',
     );
     return;
   }

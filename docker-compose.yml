@@ -5,6 +5,7 @@
 #   docker compose up -d --build    # 빌드 및 시작
 #   docker compose logs -f          # 로그 확인
 #   docker compose down              # 중지
+# Prisma Studio(로컬호스트만 바인딩): docker compose --profile studio up -d
 
 version: '3.8'
 
@@ -113,6 +114,7 @@ services:
       BOOKS_CHANNEL_ID: ${BOOKS_CHANNEL_ID}
       DIGGING_CHANNEL_ID: ${DIGGING_CHANNEL_ID}
       TABLE_LOG_CHANNEL_ID: ${TABLE_LOG_CHANNEL_ID}
+      LIVING_ROOM_CHANNEL_ID: ${LIVING_ROOM_CHANNEL_ID:-}
       BACKEND_API_URL: http://backend:3000
       DISCORD_LIBRARY_CHANNEL_ID: ${DISCORD_LIBRARY_CHANNEL_ID}
       BOT_INTERNAL_SECRET: ${BOT_INTERNAL_SECRET:?봇-백엔드 공유 시크릿 설정}
@@ -157,9 +159,13 @@ services:
     entrypoint: "/bin/sh -c 'trap exit TERM; while :; do certbot renew; sleep 12h & wait $${!}; done;'"
 
   # ==================
-  # Prisma Studio (DB 관리 UI)
+  # Prisma Studio (DB 관리 UI) — 기본 스택에 포함하지 않음
+  #   docker compose --profile studio up -d
+  # 운영 서버에서는 SSH 터널·방화벽으로만 열 것을 권장합니다.
   # ==================
   studio:
+    profiles:
+      - studio
     build:
       context: ./backend
       dockerfile: Dockerfile.studio
@@ -171,7 +177,7 @@ services:
     environment:
       DATABASE_URL: postgresql://${POSTGRES_USER:-boogibooks}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-boogibooks}
     ports:
-      - '51212:51212'
+      - '127.0.0.1:51212:51212'
     networks:
       - boogibooks-net
 

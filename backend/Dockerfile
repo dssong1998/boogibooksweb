@@ -33,5 +33,5 @@ COPY --from=builder /app/dist ./dist
 ENV NODE_ENV=production
 EXPOSE 3000
 
-# 시작 시 DB 마이그레이션 후 서버 실행
-CMD ["sh", "-c", "npx prisma db push --accept-data-loss --url \"$DATABASE_URL\" && node dist/src/main.js"]
+# 시작 시 적용 대기 중인 마이그레이션만 반영 (프로덕션 표준 — db push / --accept-data-loss 사용 금지)
+CMD ["sh", "-c", "npx prisma migrate deploy && node dist/src/main.js"]

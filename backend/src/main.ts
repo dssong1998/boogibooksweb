@@ -1,10 +1,14 @@
 import * as dotenv from 'dotenv';
 import { NestFactory } from '@nestjs/core';
+import { NestExpressApplication } from '@nestjs/platform-express';
 import { AppModule } from './app.module';
 dotenv.config();
 
 async function bootstrap() {
-  const app = await NestFactory.create(AppModule);
+  const app = await NestFactory.create<NestExpressApplication>(AppModule);
+  if (process.env.NODE_ENV === 'production') {
+    app.set('trust proxy', 1);
+  }
   if (process.env.NODE_ENV !== 'production') {
     app.enableCors();
   }
