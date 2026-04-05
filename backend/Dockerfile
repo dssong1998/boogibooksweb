@@ -9,9 +9,10 @@ WORKDIR /app
 COPY package*.json ./
 RUN npm ci
 
-# Prisma 스키마 복사 및 클라이언트 생성
+# Prisma 스키마·설정 복사 및 클라이언트 생성
+COPY prisma.config.ts ./
 COPY prisma ./prisma/
-RUN npx prisma generate
+RUN npx prisma db push
 
 # 소스 복사 및 빌드
 COPY . .
@@ -23,7 +24,9 @@ FROM node:20-alpine AS runner
 WORKDIR /app
 
 # 프로덕션 의존성 + Prisma 클라이언트
+# Prisma 7: migrate deploy / generate는 루트의 prisma.config.ts에서 datasource URL을 읽습니다.
 COPY package*.json ./
+COPY prisma.config.ts ./
 COPY prisma ./prisma/
 RUN npm ci --omit=dev && npx prisma generate
 
