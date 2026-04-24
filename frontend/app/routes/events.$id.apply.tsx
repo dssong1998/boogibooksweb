@@ -8,6 +8,7 @@ import {
   type EventData,
   type EventEligibility,
   getMe,
+  navigateHomeRememberingReturn,
   type UserData,
 } from '../lib/api';
 
@@ -33,7 +34,7 @@ export default function EventApply() {
   useEffect(() => {
     const token = localStorage.getItem('auth_token');
     if (!token) {
-      navigate('/');
+      navigateHomeRememberingReturn(navigate);
       return;
     }
 
@@ -91,14 +92,7 @@ export default function EventApply() {
             return;
           }
 
-          // 코인 사용: 정원 외 보장 신청 완료 → 대시보드로
-          if (result.status === 'COIN_GUARANTEED') {
-            alert('🪙 ' + result.message);
-            navigate('/dashboard');
-            return;
-          }
-
-          // 일반 신청: 관리자 승인 대기 → 대시보드로
+          // 일반·코인 보장(COIN_GUARANTEED): UI상 동일 — 관리자 승인 대기 안내
           alert(
             '✅ ' +
               result.message +

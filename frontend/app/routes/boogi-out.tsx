@@ -6,6 +6,7 @@ import {
   getBoogiOutList,
   getMe,
   getMyBoogiOutCertificates,
+  navigateHomeRememberingReturn,
   type BoogiOutCertificateRow,
   type BoogiOutListItem,
 } from '../lib/api';
@@ -40,6 +41,12 @@ export default function BoogiOutListPage() {
   const [loggedInMember, setLoggedInMember] = useState<boolean | null>(null);
 
   useEffect(() => {
+    const token = localStorage.getItem('auth_token');
+    if (!token) {
+      navigateHomeRememberingReturn(navigate);
+      setLoading(false);
+      return;
+    }
     (async () => {
       try {
         const data = await getBoogiOutList();
@@ -50,7 +57,7 @@ export default function BoogiOutListPage() {
         setLoading(false);
       }
     })();
-  }, []);
+  }, [navigate]);
 
   useEffect(() => {
     if (tab !== 'certificates') return;

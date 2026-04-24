@@ -4,6 +4,7 @@ import type { Route } from "./+types/boogi-out.create";
 import {
   createBoogiOut,
   getMe,
+  navigateHomeRememberingReturn,
   uploadBoogiOutPromoImage,
   type BoogiOutCostMode,
   type BoogiOutSettlementMode,
@@ -52,7 +53,7 @@ export default function BoogiOutCreatePage() {
   useEffect(() => {
     const token = localStorage.getItem("auth_token");
     if (!token) {
-      navigate("/");
+      navigateHomeRememberingReturn(navigate);
       return;
     }
     void getMe().then((me) => {

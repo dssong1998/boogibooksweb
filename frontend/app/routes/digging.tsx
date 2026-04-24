@@ -1,7 +1,12 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router";
 import type { Route } from "./+types/digging";
-import { deleteDigging, getDiggings, type DiggingData } from "../lib/api";
+import {
+  deleteDigging,
+  getDiggings,
+  navigateHomeRememberingReturn,
+  type DiggingData,
+} from "../lib/api";
 import DiggingCard from "../components/DiggingCard";
 
 export function meta({}: Route.MetaArgs) {
@@ -19,7 +24,7 @@ export default function Digging() {
   useEffect(() => {
     const token = localStorage.getItem("auth_token");
     if (!token) {
-      navigate("/");
+      navigateHomeRememberingReturn(navigate);
       return;
     }
 

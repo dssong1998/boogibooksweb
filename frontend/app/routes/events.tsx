@@ -1,7 +1,11 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router";
 import type { Route } from "./+types/events";
-import { getEvents, type EventData } from "../lib/api";
+import {
+  getEvents,
+  navigateHomeRememberingReturn,
+  type EventData,
+} from "../lib/api";
 
 export function meta({}: Route.MetaArgs) {
   return [
@@ -18,7 +22,7 @@ export default function Events() {
   useEffect(() => {
     const token = localStorage.getItem("auth_token");
     if (!token) {
-      navigate("/");
+      navigateHomeRememberingReturn(navigate);
       return;
     }
 

@@ -3,6 +3,32 @@ const API_BASE_URL =
 
 type HttpMethod = 'GET' | 'POST' | 'PATCH' | 'DELETE';
 
+/** 로그인 완료 후 복귀할 URL (sessionStorage) */
+export const POST_LOGIN_REDIRECT_KEY = 'post_login_redirect';
+
+export function rememberPostLoginRedirect(url?: string): void {
+  try {
+    if (typeof window === 'undefined') return;
+    if (window.location.pathname.startsWith('/auth')) return;
+    sessionStorage.setItem(
+      POST_LOGIN_REDIRECT_KEY,
+      url ?? window.location.href,
+    );
+  } catch {
+    /* ignore */
+  }
+}
+
+/**
+ * 토큰이 없어 로그인 플로우로 보낼 때(SPA): 현재 전체 URL을 저장한 뒤 홈으로 이동
+ */
+export function navigateHomeRememberingReturn(
+  navigate: (to: string) => unknown,
+): void {
+  rememberPostLoginRedirect();
+  void navigate('/');
+}
+
 function getAuthHeaders(): Record<string, string> {
   const token = localStorage.getItem('auth_token');
   return token ? { Authorization: `Bearer ${token}` } : {};
@@ -10,6 +36,7 @@ function getAuthHeaders(): Record<string, string> {
 
 // 토큰 만료 시 로그아웃 처리
 function handleTokenExpired() {
+  rememberPostLoginRedirect();
   localStorage.removeItem('auth_token');
   // 현재 페이지가 로그인 페이지가 아니면 리다이렉트
   if (
@@ -230,6 +257,7 @@ export interface PaymentTarget {
   settlementMode?: string;
   commissionBankName?: string | null;
   commissionAccountNumber?: string | null;
+  applicationStatus?: string;
 }
 
 export function getPaymentTarget(eventId: string, paymentKind: PaymentKindParam) {
@@ -379,6 +407,7 @@ export interface EventApplicationData {
   status:
     | 'PENDING'
     | 'APPROVED'
+    | 'PAID'
     | 'CONFIRMED'
     | 'COIN_GUARANTEED'
     | 'CANCELLED';
@@ -409,6 +438,15 @@ export function approveEventApplications(
   }>(`/events/${eventId}/approve`, 'POST', {
     applicationIds,
     finalizeApproval: options?.finalizeApproval ?? false,
+  });
+}
+
+export function confirmPaidEventApplications(
+  eventId: string,
+  applicationIds: string[],
+) {
+  return fetchAPI<{ confirmed: number }>(`/events/${eventId}/confirm-paid`, 'POST', {
+    applicationIds,
   });
 }
 

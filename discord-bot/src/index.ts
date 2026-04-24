@@ -18,6 +18,7 @@ import {
 } from './lib/libraryActivity';
 import { pushLibraryActivityToBackend } from './lib/pushLibraryActivity';
 import { processBoogiOutOutboxOnce } from './lib/processBoogiOutOutbox';
+import { processDiscordDmOutboxOnce } from './lib/processDiscordDmOutbox';
 import axios from 'axios';
 
 dotenv.config();
@@ -61,10 +62,12 @@ client.once(Events.ClientReady, async (c) => {
     }
   }
 
-  console.log('processBoogiOutOutboxOnce');
+  console.log('processBoogiOutOutboxOnce / processDiscordDmOutboxOnce');
   await processBoogiOutOutboxOnce(c);
+  await processDiscordDmOutboxOnce(c);
   setInterval(async () => {
     await processBoogiOutOutboxOnce(c);
+    await processDiscordDmOutboxOnce(c);
   }, 45_000);
 });
 

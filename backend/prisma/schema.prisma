@@ -57,6 +57,7 @@ model EventApplication {
 enum EventApplicationStatus {
   PENDING         // 신청 대기 (관리자 승인 전)
   APPROVED        // 관리자 승인됨 (결제 대기)
+  PAID            // 결제 완료 (관리자 확인/확정 전)
   CONFIRMED       // 확정 (결제 완료 또는 테라스 멤버)
   COIN_GUARANTEED // 코인 사용으로 정원 외 보장
   CANCELLED       // 취소됨
@@ -346,4 +347,17 @@ model LibraryActivityAck {
   discordUserId     String
   isValidForEvent   Boolean  @default(false)
   createdAt         DateTime @default(now())
+}
+
+// 일반 이벤트(Event) 관련 Discord DM — 백엔드 적재 후 discord-bot이 전송
+model DiscordDmOutbox {
+  id          String    @id @default(uuid())
+  kind        String    @default("EMBED_DM")
+  payload     Json
+  status      String    @default("PENDING")
+  error       String?
+  createdAt   DateTime  @default(now())
+  processedAt DateTime?
+
+  @@index([status, createdAt])
 }

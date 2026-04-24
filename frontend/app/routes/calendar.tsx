@@ -4,6 +4,7 @@ import type { Route } from './+types/calendar';
 import {
   getEvents,
   getMonthSchedules,
+  navigateHomeRememberingReturn,
   type EventData,
   type ScheduleData,
 } from '../lib/api';
@@ -69,7 +70,7 @@ export default function Calendar() {
   useEffect(() => {
     const token = localStorage.getItem('auth_token');
     if (!token) {
-      navigate('/');
+      navigateHomeRememberingReturn(navigate);
       return;
     }
   }, [navigate]);

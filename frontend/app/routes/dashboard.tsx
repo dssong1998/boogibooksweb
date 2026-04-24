@@ -11,6 +11,7 @@ import {
   getMyTableLogStats,
   getMonthlyLeaderboard,
   getMe,
+  navigateHomeRememberingReturn,
   type UserData,
   type BookData,
   type DiggingData,
@@ -67,7 +68,7 @@ export default function Dashboard() {
     const token = localStorage.getItem('auth_token');
 
     if (!token) {
-      navigate('/');
+      navigateHomeRememberingReturn(navigate);
       return;
     }
   }, [navigate]);

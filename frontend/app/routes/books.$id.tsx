@@ -8,6 +8,7 @@ import {
   getBook,
   getCommentsByBook,
   getMe,
+  navigateHomeRememberingReturn,
   type BookData,
   type CommentData,
   type CommentType,
@@ -63,7 +64,7 @@ export default function BookDetail() {
   useEffect(() => {
     const token = localStorage.getItem("auth_token");
     if (!token) {
-      navigate("/");
+      navigateHomeRememberingReturn(navigate);
       return;
     }
 

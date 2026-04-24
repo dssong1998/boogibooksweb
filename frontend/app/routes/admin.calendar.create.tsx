@@ -1,7 +1,11 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router";
 import type { Route } from "./+types/admin.calendar.create";
-import { createAdminSchedule, getMe } from "../lib/api";
+import {
+  createAdminSchedule,
+  getMe,
+  navigateHomeRememberingReturn,
+} from "../lib/api";
 
 export function meta({}: Route.MetaArgs) {
   return [
@@ -32,7 +36,7 @@ export default function AdminCalendarCreate() {
   useEffect(() => {
     const token = localStorage.getItem("auth_token");
     if (!token) {
-      navigate("/");
+      navigateHomeRememberingReturn(navigate);
       return;
     }
 
@@ -43,7 +47,7 @@ export default function AdminCalendarCreate() {
           navigate("/dashboard");
         }
       } catch {
-        navigate("/");
+        navigateHomeRememberingReturn(navigate);
       }
     };
 

@@ -12,6 +12,7 @@ import {
   getBoogiOutApplicationsForPlanner,
   getMe,
   getMyBoogiOutApplication,
+  navigateHomeRememberingReturn,
   settleBoogiOutAfterParty,
   type BoogiOutApplicationRow,
   type BoogiOutDetail,
@@ -58,6 +59,12 @@ export default function BoogiOutDetailPage() {
 
   const load = async () => {
     if (!id) return;
+    const token = localStorage.getItem('auth_token');
+    if (!token) {
+      navigateHomeRememberingReturn(navigate);
+      setLoading(false);
+      return;
+    }
     setLoading(true);
     try {
       const [ev, user] = await Promise.all([

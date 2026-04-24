@@ -1,7 +1,12 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router";
 import type { Route } from "./+types/monthly-book";
-import { createBook, getCurrentMonthlyBooks, type MonthlyBookData } from "../lib/api";
+import {
+  createBook,
+  getCurrentMonthlyBooks,
+  navigateHomeRememberingReturn,
+  type MonthlyBookData,
+} from "../lib/api";
 
 export function meta({}: Route.MetaArgs) {
   return [
@@ -20,7 +25,7 @@ export default function MonthlyBook() {
   useEffect(() => {
     const token = localStorage.getItem("auth_token");
     if (!token) {
-      navigate("/");
+      navigateHomeRememberingReturn(navigate);
       return;
     }
 

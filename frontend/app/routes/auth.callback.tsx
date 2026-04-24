@@ -1,7 +1,11 @@
 import { useEffect, useState } from "react";
 import { useSearchParams, useNavigate } from "react-router";
 import type { Route } from "./+types/auth.callback";
-import { getMe, type UserData } from "~/lib/api";
+import {
+  getMe,
+  POST_LOGIN_REDIRECT_KEY,
+  type UserData,
+} from "~/lib/api";
 
 export function meta({}: Route.MetaArgs) {
   return [
@@ -22,6 +26,15 @@ export default function AuthCallback() {
     // 토큰 저장
     localStorage.setItem("auth_token", token);
 
+    // 로그인 전 원래 가려던 페이지가 있으면 그쪽으로 먼저 이동
+    let redirectTo: string | null = null;
+    try {
+      redirectTo = sessionStorage.getItem(POST_LOGIN_REDIRECT_KEY);
+      if (redirectTo) sessionStorage.removeItem(POST_LOGIN_REDIRECT_KEY);
+    } catch {
+      /* ignore */
+    }
+
     // 유저 정보 로드
     const loadUser = async () => {
       try {
@@ -34,8 +47,26 @@ export default function AuthCallback() {
 
     loadUser();
 
-    // 대시보드로 이동
+    // 원래 페이지(있으면) 또는 대시보드로 이동
     const timer = setTimeout(() => {
+      if (redirectTo) {
+        // 같은 오리진 내 경로면 SPA 네비게이션, 아니면 hard redirect
+        try {
+          const u = new URL(redirectTo);
+          if (u.origin === window.location.origin) {
+            navigate(u.pathname + u.search + u.hash);
+            return;
+          }
+        } catch {
+          // redirectTo가 상대 경로일 수도 있음
+          if (redirectTo.startsWith("/")) {
+            navigate(redirectTo);
+            return;
+          }
+        }
+        window.location.href = redirectTo;
+        return;
+      }
       navigate("/dashboard");
     }, 1500);
 

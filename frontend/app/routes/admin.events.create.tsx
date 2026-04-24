@@ -1,7 +1,12 @@
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router';
 import type { Route } from './+types/admin.events.create';
-import { createAdminEvent, getMe, type EventType } from '../lib/api';
+import {
+  createAdminEvent,
+  getMe,
+  navigateHomeRememberingReturn,
+  type EventType,
+} from '../lib/api';
 
 export function meta({}: Route.MetaArgs) {
   return [
@@ -39,7 +44,7 @@ export default function AdminEventsCreate() {
   useEffect(() => {
     const token = localStorage.getItem('auth_token');
     if (!token) {
-      navigate('/');
+      navigateHomeRememberingReturn(navigate);
       return;
     }
 
@@ -50,7 +55,7 @@ export default function AdminEventsCreate() {
           navigate('/dashboard');
         }
       } catch {
-        navigate('/');
+        navigateHomeRememberingReturn(navigate);
       }
     };
 

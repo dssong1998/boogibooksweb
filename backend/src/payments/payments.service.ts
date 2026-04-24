@@ -25,6 +25,7 @@ export interface PaymentTargetDto {
   settlementMode?: string;
   commissionBankName?: string | null;
   commissionAccountNumber?: string | null;
+  applicationStatus?: string;
 }
 
 @Injectable()
@@ -55,7 +56,14 @@ export class PaymentsService {
       where: {
         eventId,
         userId,
-        status: EventApplicationStatus.APPROVED,
+        status: {
+          // 결제 페이지는 상태를 보여주기만 하고, CONFIRMED에서는 버튼만 막는 정책
+          in: [
+            EventApplicationStatus.APPROVED,
+            EventApplicationStatus.PAID,
+            EventApplicationStatus.CONFIRMED,
+          ],
+        },
       },
     });
     if (!app) {
@@ -67,6 +75,7 @@ export class PaymentsService {
       title: event.title,
       amount: event.price,
       eventType: event.eventType,
+      applicationStatus: app.status,
     };
   }
 

@@ -1,7 +1,12 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router";
 import type { Route } from "./+types/admin.monthly-book.create";
-import { createAdminMonthlyBook, searchBooks, getMe } from "../lib/api";
+import {
+  createAdminMonthlyBook,
+  searchBooks,
+  getMe,
+  navigateHomeRememberingReturn,
+} from "../lib/api";
 
 export function meta({}: Route.MetaArgs) {
   return [
@@ -34,7 +39,7 @@ export default function AdminMonthlyBookCreate() {
   useEffect(() => {
     const token = localStorage.getItem("auth_token");
     if (!token) {
-      navigate("/");
+      navigateHomeRememberingReturn(navigate);
       return;
     }
 
@@ -45,7 +50,7 @@ export default function AdminMonthlyBookCreate() {
           navigate("/dashboard");
         }
       } catch {
-        navigate("/");
+        navigateHomeRememberingReturn(navigate);
       }
     };
 

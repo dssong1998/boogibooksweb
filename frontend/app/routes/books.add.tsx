@@ -1,7 +1,12 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router";
 import type { Route } from "./+types/books.add";
-import { createBook, searchBooks, type NaverBookItem } from "../lib/api";
+import {
+  createBook,
+  searchBooks,
+  navigateHomeRememberingReturn,
+  type NaverBookItem,
+} from "../lib/api";
 
 export function meta({}: Route.MetaArgs) {
   return [
@@ -25,7 +30,7 @@ export default function AddBook() {
   useEffect(() => {
     const token = localStorage.getItem("auth_token");
     if (!token) {
-      navigate("/");
+      navigateHomeRememberingReturn(navigate);
     }
   }, [navigate]);
 

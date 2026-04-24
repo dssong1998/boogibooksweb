@@ -7,6 +7,7 @@ import { CreateEventDto } from './dto/create-event.dto';
 import { UpdateEventDto } from './dto/update-event.dto';
 import { PrismaService } from '../prisma/prisma.service';
 import { LibraryActivityService } from '../library/library-activity.service';
+import { DiscordDmOutboxService } from '../discord-dm/discord-dm-outbox.service';
 
 interface DiscordMessage {
   id: string;
@@ -21,16 +22,24 @@ interface DiscordThread {
   owner_id?: string; // 스레드 생성자
 }
 
-interface DiscordDMChannel {
-  id: string;
-}
+/** 이벤트 목록/상세 조회 시 신청을 순번순으로 포함 */
+const EVENT_INCLUDE_APPLICATIONS_ORDERED = {
+  include: {
+    applications: {
+      orderBy: { applicationOrder: 'asc' as const },
+    },
+  },
+} as const;
 
 @Injectable()
 export class EventsService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly libraryActivity: LibraryActivityService,
+    private readonly discordDmOutbox: DiscordDmOutboxService,
   ) {}
+
+  // --- 이벤트 CRUD ---
 
   async create(createEventDto: CreateEventDto) {
     // eslint-disable-next-line @typescript-eslint/no-unsafe-return, @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access
@@ -45,11 +54,7 @@ export class EventsService {
   async findAll() {
     // eslint-disable-next-line @typescript-eslint/no-unsafe-return, @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access
     return await (this.prisma as any).event.findMany({
-      include: {
-        applications: {
-          orderBy: { applicationOrder: 'asc' },
-        },
-      },
+      ...EVENT_INCLUDE_APPLICATIONS_ORDERED,
     });
   }
 
@@ -57,11 +62,7 @@ export class EventsService {
     // eslint-disable-next-line @typescript-eslint/no-unsafe-return, @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access
     return await (this.prisma as any).event.findUnique({
       where: { id },
-      include: {
-        applications: {
-          orderBy: { applicationOrder: 'asc' },
-        },
-      },
+      ...EVENT_INCLUDE_APPLICATIONS_ORDERED,
     });
   }
 
@@ -79,6 +80,8 @@ export class EventsService {
       where: { id },
     });
   }
+
+  // --- 서재(디스코드) 활동 검증 ---
 
   // 디스코드 서재 채널(포럼)에서 이번 달 활동 확인
   // 엄격한 조건:
@@ -259,7 +262,10 @@ export class EventsService {
     // OTHER 타입은 모두 유료(결제). 그 외에는 테라스/뉴멤버 무료
     /* eslint-disable-next-line @typescript-eslint/no-unsafe-member-access */
     const eventType = event?.eventType as string | undefined;
-    const isFree = eventType === 'OTHER' ? false : isTerras || isNewMember;
+    const isFree =
+      eventType === 'OTHER'
+        ? false
+        : isTerras || (eventType === 'MEETING' && isNewMember);
 
     // 이미 신청했는지 확인
     /* eslint-disable @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access */
@@ -341,10 +347,13 @@ export class EventsService {
     };
   }
 
+  // --- 이벤트 신청 · 관리자 승인/마감 ---
+
   // 이벤트 신청
-  // - 테라스 멤버: 바로 CONFIRMED
-  // - 코인 사용: COIN_GUARANTEED (정원 외 보장)
-  // - 일반: PENDING (관리자 승인 대기)
+  // - OTHER: 즉시 APPROVED(결제 대기)
+  // - MEETING 뉴멤버: 즉시 CONFIRMED(첫 모임 무료)
+  // - 코인: COIN_GUARANTEED
+  // - 그 외: PENDING → 승인 후 유료면 APPROVED → 입금 확인 PAID → 관리자 확정 CONFIRMED
   async applyToEvent(
     userId: string,
     eventId: string,
@@ -429,8 +438,8 @@ export class EventsService {
     if (eventTypeApply === 'OTHER') {
       status = 'APPROVED';
     }
-    // 뉴멤버 또는 MEETING이 아닌 타입: 바로 CONFIRMED (승인 없이 확정)
-    else if (isNewMember || eventTypeApply !== 'MEETING') {
+    // 대면모임 뉴멤버(첫 모임 무료): 신청 즉시 확정
+    else if (isNewMember && eventTypeApply === 'MEETING') {
       status = 'CONFIRMED';
     }
     // 코인 사용: COIN_GUARANTEED (정원 외 보장)
@@ -460,8 +469,15 @@ export class EventsService {
       usedCoins,
       libraryMessageCount: libraryActivity.messageCount,
       isNewMember,
-      paidAt: isOtherEvent ? null : isNewMember ? new Date() : null,
-      approvedAt: isOtherEvent || isNewMember ? new Date() : null,
+      paidAt: isOtherEvent
+        ? null
+        : isNewMember && eventTypeApply === 'MEETING'
+          ? new Date()
+          : null,
+      approvedAt:
+        isOtherEvent || (isNewMember && eventTypeApply === 'MEETING')
+          ? new Date()
+          : null,
     };
 
     if (isReapplyFromCancelled) {
@@ -480,6 +496,26 @@ export class EventsService {
         },
       });
     }
+
+    /* eslint-disable @typescript-eslint/no-unsafe-member-access */
+    const applicantUsername = String(user.username);
+    const eventTitleForNotify = String(event.title);
+    /* eslint-enable @typescript-eslint/no-unsafe-member-access */
+
+    void this.notifyAdminsNewEventApplication({
+      eventId,
+      eventTitle: eventTitleForNotify,
+      eventType: eventTypeApply,
+      applicantUsername,
+      applicationOrder,
+      status,
+      isTerras,
+      isNewMember,
+      isOverCapacity,
+      reapplied: Boolean(isReapplyFromCancelled),
+    }).catch((err: unknown) => {
+      console.error('관리자 이벤트 신청 알림 DM 실패:', err);
+    });
 
     // OTHER: 선착순 자동 승인 → 결제 안내 DM 전송 (테라스/뉴멤버 동일)
     if (isOtherEvent) {
@@ -508,8 +544,8 @@ export class EventsService {
       };
     }
 
-    // 뉴멤버는 isNewMember 플래그 해제 (첫 모임 무료 혜택 사용)
-    if (isNewMember) {
+    // 대면모임 뉴멤버: isNewMember 플래그 해제 (첫 모임 무료 혜택 사용)
+    if (isNewMember && eventTypeApply === 'MEETING') {
       // eslint-disable-next-line @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access
       await (this.prisma as any).user.update({
         where: { id: userId },
@@ -537,7 +573,7 @@ export class EventsService {
     // 참가자 수는 applications 배열 길이로 자동 계산되므로 별도 업데이트 불필요
 
     let message: string;
-    if (isNewMember) {
+    if (isNewMember && eventTypeApply === 'MEETING') {
       message = `🎉 ${applicationOrder}번째로 참석이 확정되었습니다! (뉴멤버 첫 모임 무료) 디스코드 DM으로 이벤트 정보가 전송되었습니다.`;
     } else if (useCoins) {
       message = `${applicationOrder}번째로 신청되었습니다. 코인 ${usedCoins}개를 사용하여 정원 외 보장됩니다. 정원이 차면 자동으로 참석이 확정됩니다.`;
@@ -554,15 +590,15 @@ export class EventsService {
       applicationOrder,
       status,
       usedCoins,
-      isFree: isTerras || isNewMember, // 테라스 또는 뉴멤버는 무료
+      isFree: isTerras || (isNewMember && eventTypeApply === 'MEETING'),
       message,
       libraryMessageCount: libraryActivity.messageCount,
     };
   }
 
   // 관리자: 신청 승인 (여러 명 동시 승인 가능)
-  // 테라스 멤버/뉴멤버 → CONFIRMED + 참석 확정 DM
-  // 일반 멤버 → APPROVED + 결제 안내 DM
+  // MEETING: 테라스 또는 뉴멤버(신청 시점) → CONFIRMED(PAID 생략) + 참석 확정 DM
+  // DIGGING 등: 테라스만 → CONFIRMED(PAID 생략); 그 외 → APPROVED + 결제 안내 DM
   // 코인 사용자 승인 시 → 코인 반환 + 이달의 멤버 선정 DM
   // finalizeApproval=true → 미승인 PENDING 신청자에게 거절 DM 전송
   async approveApplications(
@@ -593,7 +629,7 @@ export class EventsService {
       coins: number;
       discordId: string;
     }[] = [];
-    // 테라스 멤버와 뉴멤버 (무료 확정)
+    // 승인 후 참석 확정 DM 대상(무료 확정 처리된 신청)
     const freeUsers: { discordId: string; isNewMember: boolean }[] = [];
     const paymentUsers: {
       userId: string;
@@ -613,9 +649,17 @@ export class EventsService {
       const appEventId = application.eventId as string;
       const appStatus = application.status as string;
       if (appEventId !== eventId) continue;
-      if (appStatus === 'CONFIRMED' || appStatus === 'APPROVED') continue;
+      // PAID는 입금 확인 대기 — 승인 루프에서 건너뜀(확정은 confirmPaidApplications)
+      if (
+        appStatus === 'CONFIRMED' ||
+        appStatus === 'APPROVED' ||
+        appStatus === 'PAID'
+      ) {
+        continue;
+      }
 
       const usedCoins = application.usedCoins as number;
+
       const appUserId = application.userId as string;
       const userDiscordId = application.user.discordId as string;
       const userIsTerras = application.user.isTerras as boolean;
@@ -658,6 +702,11 @@ export class EventsService {
 
       const eventTypeApprove = event.eventType as string;
       const isOtherEvent = eventTypeApprove === 'OTHER';
+      const freeOnApprove = this.isFreeConfirmOnAdminApprove(
+        eventTypeApprove,
+        userIsTerras,
+        appIsNewMember,
+      );
 
       // OTHER 이벤트: 테라스/뉴멤버 구분 없이 모두 APPROVED + 결제 안내
       if (isOtherEvent) {
@@ -670,8 +719,8 @@ export class EventsService {
           discordId: userDiscordId,
         });
       }
-      // 테라스 멤버 또는 뉴멤버: CONFIRMED + 참석 확정 DM (무료)
-      else if (userIsTerras || appIsNewMember) {
+      // 무료 확정(PAID 생략)
+      else if (freeOnApprove) {
         await (this.prisma as any).eventApplication.update({
           where: { id: appId },
           data: {
@@ -685,8 +734,8 @@ export class EventsService {
           isNewMember: appIsNewMember,
         });
 
-        // 뉴멤버가 승인되면 isNewMember 플래그 해제 (첫 모임 무료 혜택 사용)
-        if (appIsNewMember) {
+        // 대면모임 뉴멤버: isNewMember 플래그 해제 (첫 모임 무료 혜택 사용)
+        if (appIsNewMember && eventTypeApprove === 'MEETING') {
           await (this.prisma as any).user.update({
             where: { id: appUserId },
             data: { isNewMember: false },
@@ -709,7 +758,6 @@ export class EventsService {
     // DM 전송
     let dmSent = 0;
 
-    // 테라스 멤버/뉴멤버에게 참석 확정 DM
     for (const user of freeUsers) {
       const sent = await this.sendConfirmationDM(
         user.discordId,
@@ -747,7 +795,7 @@ export class EventsService {
     );
 
     // finalizeApproval=true면 남은 신청자들을 '마감 처리' 규칙대로 정리
-    // - 코인 사용자 / 뉴멤버: 승인 처리
+    // - 코인 사용자 또는 MEETING 뉴멤버: 승인 처리
     //   - 유료 대상: APPROVED + 결제 안내 DM
     //   - 무료 대상: CONFIRMED + 확정 안내 DM
     // - 그 외: CANCELLED + 거절 DM
@@ -774,6 +822,19 @@ export class EventsService {
       autoApprovedCoinUsers: autoApproved,
       rejectedCount,
     };
+  }
+
+  /**
+   * 관리자 승인(또는 마감 시 자동 승인) 직후 입금(PAID) 없이 확정되는 경우.
+   * MEETING: 테라스 또는 뉴멤버(신청 시점). DIGGING 등: 테라스만.
+   */
+  private isFreeConfirmOnAdminApprove(
+    eventType: string,
+    userIsTerras: boolean,
+    appIsNewMember: boolean,
+  ): boolean {
+    if (userIsTerras) return true;
+    return eventType === 'MEETING' && appIsNewMember;
   }
 
   private async finalizeRemainingApplicants(input: {
@@ -819,7 +880,13 @@ export class EventsService {
       const isCoinUser = usedCoins > 0;
       const shouldApprove = isCoinUser || appIsNewMember;
 
-      const isFreeTarget = !isOtherEvent && (userIsTerras || appIsNewMember);
+      const isFreeTarget =
+        !isOtherEvent &&
+        this.isFreeConfirmOnAdminApprove(
+          input.eventType,
+          userIsTerras,
+          appIsNewMember,
+        );
 
       // 코인 사용자는 '승인(마감)으로 인해 코인을 사용 처리'되는 케이스이므로 환불하지 않음.
       // apply 시점에 coins decrement + usedCoins 기록(COIN_GUARANTEED)되어 있다고 가정하고 그대로 유지.
@@ -835,8 +902,8 @@ export class EventsService {
             },
           });
 
-          // 뉴멤버가 확정되면 isNewMember 플래그 해제 (첫 모임 무료 혜택 사용)
-          if (appIsNewMember) {
+          // 대면모임 뉴멤버: isNewMember 플래그 해제
+          if (appIsNewMember && input.eventType === 'MEETING') {
             await (this.prisma as any).user.update({
               where: { id: appUserId },
               data: { isNewMember: false },
@@ -991,7 +1058,9 @@ export class EventsService {
     return autoApproved;
   }
 
-  // 참석 확정 DM (테라스 멤버, 뉴멤버 또는 코인 반환 시)
+  // --- Discord DM ---
+
+  // 참석 확정 DM (테라스·뉴멤버 무료 확정 또는 코인 반환 확정)
   private async sendConfirmationDM(
     discordId: string,
     eventTitle: string,
@@ -1081,8 +1150,9 @@ export class EventsService {
     });
   }
 
-  // 이벤트 신청자 목록 조회 (관리자용)
-  // 코인 사용 여부는 관리자에게 숨김
+  // --- 신청 목록 · 사용자 결제/취소 ---
+
+  // 이벤트 신청자 목록 조회 (관리자용, 코인 보장은 PENDING으로 마스킹)
   async getApplications(eventId: string) {
     /* eslint-disable @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access */
     const applications = await (this.prisma as any).eventApplication.findMany({
@@ -1115,15 +1185,35 @@ export class EventsService {
     userId: string,
     eventId: string,
   ): Promise<{ success: boolean; message: string }> {
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access
+    /* eslint-disable @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access */
     const application = await (this.prisma as any).eventApplication.findUnique({
       where: {
         eventId_userId: { eventId, userId },
       },
+      include: { user: true, event: true },
     });
+    /* eslint-enable @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access */
 
     if (!application) {
       throw new BadRequestException('신청 내역을 찾을 수 없습니다.');
+    }
+
+    /* eslint-disable @typescript-eslint/no-unsafe-member-access */
+    const status = application.status as string;
+    /* eslint-enable @typescript-eslint/no-unsafe-member-access */
+
+    if (status === 'CONFIRMED') {
+      throw new BadRequestException(
+        '이미 참가가 확정되어 결제 확인을 다시 진행할 수 없습니다.',
+      );
+    }
+
+    const message =
+      '송금 확인 요청이 완료되었습니다. 확인 후 참가가 확정됩니다.';
+
+    // 이미 PAID: 토스 재진입 등 — 상태·paidAt 유지(멱등)
+    if (status === 'PAID') {
+      return { success: true, message };
     }
 
     // eslint-disable-next-line @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access
@@ -1132,15 +1222,210 @@ export class EventsService {
         eventId_userId: { eventId, userId },
       },
       data: {
-        status: 'CONFIRMED',
+        // 입금/결제 완료 표시만 하고, 최종 확정(CONFIRMED)은 관리자가 별도 처리
+        status: 'PAID',
         paidAt: new Date(),
       },
     });
 
+    /* eslint-disable @typescript-eslint/no-unsafe-member-access */
+    const eventTitle = String((application as { event: { title: string } }).event.title);
+    const payerUsername = String(
+      (application as { user: { username: string } }).user.username,
+    );
+    const price = Number((application as { event: { price: unknown } }).event.price) || 0;
+    /* eslint-enable @typescript-eslint/no-unsafe-member-access */
+
+    void this.notifyAdminEventParticipantPaid(
+      eventId,
+      eventTitle,
+      payerUsername,
+      price,
+    ).catch((err: unknown) => {
+      console.error('이벤트 입금 admin1 알림 DM 전송 실패:', err);
+    });
+
     return {
       success: true,
-      message: '결제가 완료되었습니다.',
+      message,
     };
+  }
+
+  /** 참가자가 confirm-payment로 PAID가 된 직후 admin1에게 디스코드 DM */
+  private async notifyAdminEventParticipantPaid(
+    eventId: string,
+    eventTitle: string,
+    payerUsername: string,
+    price: number,
+  ): Promise<void> {
+    const adminDiscordId = await this.resolveAdmin1DiscordId();
+    if (!adminDiscordId) {
+      console.warn(
+        '이벤트 입금 알림: 관리자 Discord ID를 찾지 못했습니다. backend .env의 ADMIN_ID1(디스코드 유저 ID)을 설정하거나 DB에 username이 admin1인 사용자를 두세요.',
+      );
+      return;
+    }
+
+    const base = process.env.FRONTEND_URL || 'https://boogibooks.com';
+    const adminUrl = `${base.replace(/\/$/, '')}/admin`;
+
+    await this.sendDiscordDM(adminDiscordId, {
+      title: '💰 이벤트 참가비 입금 알림',
+      description: [
+        `**${eventTitle}**`,
+        '',
+        `참가자 **${payerUsername}** 님이 송금 완료 처리하여 **PAID**(확정 대기) 상태가 되었습니다.`,
+        '관리자 페이지에서 입금 확인 후 확정해 주세요.',
+      ].join('\n'),
+      color: 0xf59e0b,
+      fields: [
+        {
+          name: '참가비',
+          value: `${price.toLocaleString('ko-KR')}원`,
+          inline: true,
+        },
+        { name: '이벤트 ID', value: eventId, inline: true },
+      ],
+      url: adminUrl,
+      footerText: '부기북스 · 관리자 알림',
+    });
+  }
+
+  /**
+   * 디스코드 유저 스노플레이크.
+   * backend .env `ADMIN_ID1` → 없으면 username admin1 DB 조회.
+   */
+  private async resolveAdmin1DiscordId(): Promise<string | null> {
+    const fromEnv = process.env.ADMIN_ID1?.trim();
+    if (fromEnv) return fromEnv;
+
+    try {
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access
+      const u = await (this.prisma as any).user.findFirst({
+        where: {
+          username: { equals: 'admin1', mode: 'insensitive' },
+        },
+        select: { discordId: true },
+      });
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
+      const id = u?.discordId as string | undefined;
+      return id?.trim() || null;
+    } catch (e) {
+      console.warn('admin1 사용자 Discord ID 조회 실패:', e);
+      return null;
+    }
+  }
+
+  /** backend .env `ADMIN_ID1`~`ADMIN_ID3`(Discord user id). 빈 값 제외, 중복 제거. */
+  private getAdminDiscordIdsFromEnv(): string[] {
+    const ids = [
+      process.env.ADMIN_ID1?.trim(),
+      process.env.ADMIN_ID2?.trim(),
+      process.env.ADMIN_ID3?.trim(),
+    ].filter((id): id is string => Boolean(id));
+    return [...new Set(ids)];
+  }
+
+  private formatEventApplicationStatusKo(status: string): string {
+    const normalized = status === 'COIN_GUARANTEED' ? 'PENDING' : status;
+    const labels: Record<string, string> = {
+      PENDING: '승인 대기',
+      APPROVED: '승인됨(결제 대기)',
+      PAID: '결제 완료(확정 대기)',
+      CONFIRMED: '확정',
+      CANCELLED: '취소',
+    };
+    return labels[normalized] ?? normalized;
+  }
+
+  private formatEventTypeKo(t: string): string {
+    const labels: Record<string, string> = {
+      MEETING: '대면모임',
+      DIGGING_CLUB: '디깅클럽',
+      ONLINE: '온라인',
+      OTHER: '기타',
+      BOOGITOUT: '부깃아웃',
+    };
+    return labels[t] ?? t;
+  }
+
+  /** 신청 생성·재신청 직후 ADMIN_ID1~3에게 디스코드 DM */
+  private async notifyAdminsNewEventApplication(payload: {
+    eventId: string;
+    eventTitle: string;
+    eventType: string;
+    applicantUsername: string;
+    applicationOrder: number;
+    status: string;
+    isTerras: boolean;
+    isNewMember: boolean;
+    isOverCapacity: boolean;
+    reapplied: boolean;
+  }): Promise<void> {
+    const adminIds = this.getAdminDiscordIdsFromEnv();
+    if (adminIds.length === 0) {
+      console.warn(
+        '이벤트 신청 관리자 알림: ADMIN_ID1~ADMIN_ID3이 모두 비어 있어 DM을 보내지 않습니다.',
+      );
+      return;
+    }
+
+    const base = process.env.FRONTEND_URL || 'https://boogibooks.com';
+    const adminUrl = `${base.replace(/\/$/, '')}/admin`;
+
+    const lines = [
+      `**${payload.eventTitle}**`,
+      '',
+      `• 신청자: **${payload.applicantUsername}**`,
+      `• 신청 순번: **${payload.applicationOrder}**번`,
+      `• 신청 후 상태: **${this.formatEventApplicationStatusKo(payload.status)}**`,
+      `• 이벤트 유형: ${this.formatEventTypeKo(payload.eventType)}`,
+    ];
+    lines.push(`• 테라스 멤버: ${payload.isTerras ? '예' : '아니오'}`);
+    lines.push(`• 뉴멤버(신청 시점): ${payload.isNewMember ? '예' : '아니오'}`);
+    if (payload.isOverCapacity) {
+      lines.push('• **정원 초과** 순번입니다.');
+    }
+    if (payload.reapplied) {
+      lines.push('• 이전 취소 후 **재신청**입니다.');
+    }
+
+    const description = lines.join('\n');
+
+    for (const discordId of adminIds) {
+      await this.sendDiscordDM(discordId, {
+        title: '📝 이벤트 신청 알림',
+        description,
+        color: 0x3b82f6,
+        fields: [{ name: '이벤트 ID', value: payload.eventId, inline: false }],
+        url: adminUrl,
+        footerText: '부기북스 · 관리자 알림',
+      });
+    }
+  }
+
+  /**
+   * 관리자: 입금 확인 후 확정 처리
+   * - PAID → CONFIRMED
+   */
+  async confirmPaidApplications(
+    eventId: string,
+    applicationIds: string[],
+  ): Promise<{ confirmed: number }> {
+    if (!applicationIds?.length) return { confirmed: 0 };
+
+    const res = await (this.prisma as any).eventApplication.updateMany({
+      where: {
+        id: { in: applicationIds },
+        eventId,
+        status: 'PAID',
+      },
+      data: {
+        status: 'CONFIRMED',
+      },
+    });
+
+    return { confirmed: Number(res?.count ?? 0) };
   }
 
   // 신청 취소
@@ -1193,7 +1478,9 @@ export class EventsService {
     };
   }
 
-  // Discord DM 전송 (결제 안내 또는 코인 반환 알림)
+  /**
+   * Discord 임베드 DM — HTTP 직접 호출 대신 outbox 적재 후 discord-bot이 전송.
+   */
   async sendDiscordDM(
     discordId: string,
     content: {
@@ -1202,76 +1489,19 @@ export class EventsService {
       color?: number;
       fields?: { name: string; value: string; inline?: boolean }[];
       url?: string;
+      /** 기본: 결제 안내 문구. 관리자 알림 등에서 덮어쓸 수 있음 */
+      footerText?: string;
     },
   ): Promise<boolean> {
-    const botToken = process.env.DISCORD_BOT_TOKEN;
-    if (!botToken) {
-      console.warn('Discord bot token not configured for DM');
-      return false;
-    }
-
-    try {
-      // DM 채널 생성
-      const dmChannelRes = await fetch(
-        'https://discord.com/api/v10/users/@me/channels',
-        {
-          method: 'POST',
-          headers: {
-            Authorization: `Bot ${botToken}`,
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({ recipient_id: discordId }),
-        },
-      );
-
-      if (!dmChannelRes.ok) {
-        console.error(
-          'Failed to create DM channel:',
-          await dmChannelRes.text(),
-        );
-        return false;
-      }
-
-      const dmChannel = (await dmChannelRes.json()) as DiscordDMChannel;
-
-      // 임베드 메시지 전송
-      const messageRes = await fetch(
-        `https://discord.com/api/v10/channels/${dmChannel.id}/messages`,
-        {
-          method: 'POST',
-          headers: {
-            Authorization: `Bot ${botToken}`,
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({
-            embeds: [
-              {
-                title: content.title,
-                description: content.description,
-                color: content.color ?? 0x7c9070, // 세이지 그린
-                fields: content.fields ?? [],
-                url: content.url,
-                timestamp: new Date().toISOString(),
-                footer: {
-                  text: '부기북스 | 링크를 클릭하면 결제창이 열립니다',
-                  icon_url: `${process.env.FRONTEND_URL || 'https://boogibooks.com'}/logo.png`,
-                },
-              },
-            ],
-          }),
-        },
-      );
-
-      if (!messageRes.ok) {
-        console.error('Failed to send DM:', await messageRes.text());
-        return false;
-      }
-
-      return true;
-    } catch (error) {
-      console.error('Error sending Discord DM:', error);
-      return false;
-    }
+    return this.discordDmOutbox.enqueueEmbedDm(discordId, {
+      title: content.title,
+      description: content.description,
+      color: content.color ?? 0x7c9070,
+      fields: content.fields ?? [],
+      url: content.url,
+      footerText:
+        content.footerText ?? '부기북스 | 링크를 클릭하면 결제창이 열립니다',
+    });
   }
 
   // 승인 후 결제 DM 전송

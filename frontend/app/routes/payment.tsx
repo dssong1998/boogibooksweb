@@ -112,6 +112,10 @@ export default function Payment() {
   }, [eventId, paymentKind, userIdParam]);
 
   const price = target?.amount ?? 0;
+  const isConfirmed =
+    target?.paymentKind === "EVENT" && target.applicationStatus === "CONFIRMED";
+  const isPaid =
+    target?.paymentKind === "EVENT" && target.applicationStatus === "PAID";
 
   const useCommissionBank =
     target?.paymentKind === "BOOGI_OUT" &&
@@ -167,13 +171,24 @@ export default function Payment() {
       alert("결제 정보가 올바르지 않습니다.");
       return;
     }
+    if (isConfirmed) {
+      alert("이미 참가가 확정되었습니다. 추가 결제는 할 수 없습니다.");
+      return;
+    }
 
     setIsConfirming(true);
     try {
-      if (target.paymentKind === "BOOGI_OUT") {
-        await confirmBoogiOutPayment(eventId);
-      } else {
-        await confirmEventPayment(eventId, userIdParam ? currentUserId : undefined);
+      const skipEventPaidConfirm =
+        target.paymentKind === "EVENT" && isPaid;
+      if (!skipEventPaidConfirm) {
+        if (target.paymentKind === "BOOGI_OUT") {
+          await confirmBoogiOutPayment(eventId);
+        } else {
+          await confirmEventPayment(
+            eventId,
+            userIdParam ? currentUserId : undefined,
+          );
+        }
       }
 
       window.location.href = getTossDeepLink(price);
@@ -194,6 +209,10 @@ export default function Payment() {
   const handleConfirmPayment = async () => {
     if (!eventId || !currentUserId || !target) {
       alert("결제 정보가 올바르지 않습니다.");
+      return;
+    }
+    if (isConfirmed) {
+      alert("이미 참가가 확정되었습니다. 추가 결제는 할 수 없습니다.");
       return;
     }
 
@@ -362,10 +381,19 @@ export default function Payment() {
           </div>
 
           <div className="mb-6">
+            {(isConfirmed || isPaid) && (
+              <div className="mb-4 p-4 bg-green-50 dark:bg-green-900/20 rounded-lg border border-green-200 dark:border-green-800">
+                <p className="text-sm text-green-800 dark:text-green-300 font-medium">
+                  {isConfirmed
+                    ? "✅ 이미 참가가 확정된 상태입니다. 결제는 다시 진행할 수 없습니다."
+                    : "💸 이미 입금 확인 요청이 접수된 상태입니다. 중복하여 결제하지 않도록 주의해주세요."}
+                </p>
+              </div>
+            )}
             <button
               type="button"
               onClick={() => void handleTossPayment()}
-              disabled={isConfirming}
+              disabled={isConfirming || isConfirmed}
               className="w-full px-6 py-5 bg-[#0064FF] text-white rounded-xl hover:bg-[#0052D4] transition-colors font-bold text-xl disabled:bg-gray-400 disabled:cursor-not-allowed flex items-center justify-center space-x-3 shadow-lg"
             >
               {isConfirming ? (
@@ -380,7 +408,9 @@ export default function Payment() {
               )}
             </button>
             <p className="text-center text-sm text-gray-500 dark:text-gray-400 mt-2">
-              버튼을 누르면 토스앱이 열리고 결제 완료 처리가 진행됩니다
+              {isPaid
+                ? "버튼을 누르면 토스앱만 열립니다. (이미 입금 확인 요청된 경우 DB는 변경되지 않습니다)"
+                : "버튼을 누르면 토스앱이 열리고 결제 완료 처리가 진행됩니다"}
             </p>
           </div>
 
@@ -411,7 +441,7 @@ export default function Payment() {
             <button
               type="button"
               onClick={() => void handleConfirmPayment()}
-              disabled={isConfirming}
+              disabled={isConfirming || isConfirmed}
               className="w-full px-6 py-3 bg-gray-600 text-white rounded-lg hover:bg-gray-700 transition-colors font-medium disabled:bg-gray-400 disabled:cursor-not-allowed"
             >
               {isConfirming ? "처리 중..." : "직접 송금 완료"}

@@ -10,6 +10,8 @@ import {
   deleteAdminSchedule,
   getEventApplications,
   approveEventApplications,
+  confirmPaidEventApplications,
+  navigateHomeRememberingReturn,
   getMe,
   type EventData,
   type MonthlyBookData,
@@ -47,11 +49,15 @@ export default function Admin() {
   const [selectedApplications, setSelectedApplications] = useState<Set<string>>(new Set());
   const [isApproving, setIsApproving] = useState(false);
   const [isFinalizing, setIsFinalizing] = useState(false);
+  const [isConfirmingPaid, setIsConfirmingPaid] = useState(false);
+  const [confirmingPaidAppId, setConfirmingPaidAppId] = useState<string | null>(
+    null,
+  );
 
   useEffect(() => {
     const token = localStorage.getItem("auth_token");
     if (!token) {
-      navigate("/");
+      navigateHomeRememberingReturn(navigate);
       return;
     }
 
@@ -64,7 +70,7 @@ export default function Admin() {
         }
         setUser(userData);
       } catch {
-        navigate("/");
+        navigateHomeRememberingReturn(navigate);
       }
     };
 
@@ -251,12 +257,75 @@ export default function Admin() {
     }
   };
 
+  const handleConfirmPaid = async () => {
+    if (!selectedEventId) return;
+    const paidApps = applications.filter((a) => a.status === "PAID");
+    if (paidApps.length === 0) {
+      alert("결제완료(확정대기) 상태인 신청자가 없습니다.");
+      return;
+    }
+    const ids = paidApps.map((a) => a.id);
+    if (
+      !confirm(
+        `결제완료(확정대기) ${ids.length}명을 확정 처리하시겠습니까?\n(확정 후에는 결제 페이지에서 재결제가 불가능합니다.)`,
+      )
+    ) {
+      return;
+    }
+
+    setIsConfirmingPaid(true);
+    try {
+      const result = await confirmPaidEventApplications(selectedEventId, ids);
+      alert(`확정 완료: ${result.confirmed}명`);
+      const data = await getEventApplications(selectedEventId);
+      setApplications(data);
+      setSelectedApplications(new Set());
+    } catch (error) {
+      console.error("Failed to confirm paid applications:", error);
+      alert("확정 처리에 실패했습니다.");
+    } finally {
+      setIsConfirmingPaid(false);
+    }
+  };
+
+  const handleConfirmOnePaid = async (appId: string) => {
+    if (!selectedEventId) return;
+    if (
+      !confirm(
+        "이 신청의 입금을 확인하고 확정(CONFIRMED) 처리할까요?\n(확정 후에는 결제 페이지에서 재결제가 불가능합니다.)",
+      )
+    ) {
+      return;
+    }
+    setConfirmingPaidAppId(appId);
+    try {
+      const result = await confirmPaidEventApplications(selectedEventId, [
+        appId,
+      ]);
+      if (result.confirmed === 0) {
+        alert(
+          "확정 처리된 건이 없습니다. 이미 확정되었거나 상태가 아닐 수 있습니다.",
+        );
+      } else {
+        alert("확정 처리되었습니다.");
+      }
+      const data = await getEventApplications(selectedEventId);
+      setApplications(data);
+    } catch (error) {
+      console.error("Failed to confirm one paid application:", error);
+      alert("확정 처리에 실패했습니다.");
+    } finally {
+      setConfirmingPaidAppId(null);
+    }
+  };
+
   const getStatusLabel = (status: string) => {
     switch (status) {
       case "PENDING": return { text: "승인대기", color: "amber" };
       case "APPROVED": return { text: "승인됨(결제대기)", color: "blue" };
+      case "PAID": return { text: "결제완료(확정대기)", color: "indigo" };
       case "CONFIRMED": return { text: "확정", color: "green" };
-      case "COIN_GUARANTEED": return { text: "코인확정", color: "purple" };
+      case "COIN_GUARANTEED": return { text: "승인대기", color: "amber" };
       case "CANCELLED": return { text: "취소", color: "red" };
       default: return { text: status, color: "gray" };
     }
@@ -662,6 +731,32 @@ export default function Admin() {
               </div>
             )}
 
+            {applications.some((a) => a.status === "PAID") && (
+              <div className="px-6 py-3 bg-indigo-50 dark:bg-indigo-900/20 border-b border-indigo-100 dark:border-indigo-800 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+                <div>
+                  <p className="text-sm font-medium text-indigo-900 dark:text-indigo-200">
+                    입금 확인 (확정 처리)
+                  </p>
+                  <p className="text-xs text-indigo-800/90 dark:text-indigo-300/90 mt-0.5">
+                    결제완료(확정대기) 신청자를 확정으로 변경합니다.
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={handleConfirmPaid}
+                  disabled={
+                    isConfirmingPaid ||
+                    confirmingPaidAppId !== null ||
+                    isApproving ||
+                    isFinalizing
+                  }
+                  className="shrink-0 px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors text-sm font-medium"
+                >
+                  {isConfirmingPaid ? "처리 중..." : "PAID 전체 확정하기"}
+                </button>
+              </div>
+            )}
+
             <div className="p-6 overflow-y-auto max-h-[55vh]">
               {loadingApplications ? (
                 <div className="text-center py-8">
@@ -734,24 +829,45 @@ export default function Admin() {
                           </p>
                         </div>
 
-                        {/* 상태 */}
-                        <span
-                          className={`px-3 py-1 text-sm font-medium rounded-full ${
-                            statusInfo.color === "green"
-                              ? "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-300"
-                              : statusInfo.color === "blue"
-                              ? "bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300"
-                              : statusInfo.color === "amber"
-                              ? "bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-300"
-                              : statusInfo.color === "purple"
-                              ? "bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-300"
-                              : statusInfo.color === "red"
-                              ? "bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-300"
-                              : "bg-gray-100 text-gray-700 dark:bg-gray-600 dark:text-gray-300"
-                          }`}
-                        >
-                          {statusInfo.text}
-                        </span>
+                        {/* 상태 · PAID 건별 입금 확인 */}
+                        <div className="flex flex-col items-end gap-2 shrink-0 ml-2">
+                          <span
+                            className={`px-3 py-1 text-sm font-medium rounded-full ${
+                              statusInfo.color === "green"
+                                ? "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-300"
+                                : statusInfo.color === "blue"
+                                  ? "bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300"
+                                  : statusInfo.color === "indigo"
+                                    ? "bg-indigo-100 text-indigo-800 dark:bg-indigo-900/40 dark:text-indigo-200"
+                                    : statusInfo.color === "amber"
+                                      ? "bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-300"
+                                      : statusInfo.color === "purple"
+                                        ? "bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-300"
+                                        : statusInfo.color === "red"
+                                          ? "bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-300"
+                                          : "bg-gray-100 text-gray-700 dark:bg-gray-600 dark:text-gray-300"
+                            }`}
+                          >
+                            {statusInfo.text}
+                          </span>
+                          {app.status === "PAID" && (
+                            <button
+                              type="button"
+                              onClick={() => void handleConfirmOnePaid(app.id)}
+                              disabled={
+                                confirmingPaidAppId !== null ||
+                                isConfirmingPaid ||
+                                isApproving ||
+                                isFinalizing
+                              }
+                              className="px-2.5 py-1 text-xs font-medium rounded-lg bg-indigo-600 text-white hover:bg-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors whitespace-nowrap"
+                            >
+                              {confirmingPaidAppId === app.id
+                                ? "처리 중..."
+                                : "결제 확인 완료"}
+                            </button>
+                          )}
+                        </div>
                       </div>
                     );
                   })}
@@ -764,6 +880,7 @@ export default function Admin() {
                 <span>
                   총 {applications.length}명 · 
                   승인대기 {applications.filter(a => a.status === "PENDING").length}명 · 
+                  결제완료 {applications.filter(a => a.status === "PAID").length}명 ·
                   확정 {applications.filter(a => a.status === "CONFIRMED" || a.status === "COIN_GUARANTEED").length}명
                 </span>
                 <span className="text-xs text-right max-w-xs">

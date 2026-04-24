@@ -114,4 +114,16 @@ export class EventsController {
       body.finalizeApproval ?? false,
     );
   }
+
+  // 관리자: 입금 확인 후 확정 처리 (PAID → CONFIRMED)
+  @Post(':id/confirm-paid')
+  confirmPaid(
+    @Param('id') eventId: string,
+    @Body() body: { applicationIds: string[] },
+  ) {
+    return this.eventsService.confirmPaidApplications(
+      eventId,
+      body.applicationIds ?? [],
+    );
+  }
 }
