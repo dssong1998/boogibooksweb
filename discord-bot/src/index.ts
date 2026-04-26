@@ -25,6 +25,7 @@ dotenv.config();
 
 const GUILD_ID = process.env.DISCORD_GUILD_ID;
 const ADMIN_ID1 = process.env.ADMIN_ID1;
+const ROLE_REGULAR = (process.env.ROLE_REGULAR || '').trim();
 const BACKEND_URL = process.env.BACKEND_API_URL || 'http://localhost:3000';
 
 type NaverBookItem = {
@@ -302,6 +303,19 @@ client.on(Events.ThreadCreate, async (thread) => {
 
   const owner = await thread.fetchOwner().catch(() => null);
   if (owner?.user?.bot) return;
+
+  // 새 포스트 생성 시 ROLE_REGULAR 멘션 알림 (삭제하지 않음)
+  if (ROLE_REGULAR) {
+    try {
+      await thread.send(
+        `<@&${ROLE_REGULAR}> 여러분께 전송되는 새 책 추가 알림입니다.`,
+      );
+    } catch (e) {
+      console.error('[library-thread] ROLE_REGULAR 멘션 메시지 전송 실패:', e);
+    }
+  } else {
+    console.warn('[library-thread] ROLE_REGULAR 미설정 — 멘션 알림 스킵');
+  }
 
   await pushLibraryActivityToBackend({
     discordUserId: thread.ownerId,

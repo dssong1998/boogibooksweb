@@ -11,7 +11,9 @@
     "seed:books": "ts-node src/scripts/initialSeed.ts --only=books",
     "backfill:library": "ts-node src/scripts/backfillLibraryActivity.ts",
     "backfill:books": "ts-node src/scripts/backfillLibraryBooks.ts",
-    "embedRead": "ts-node src/scripts/embedRead.ts"
+    "embedRead": "ts-node src/scripts/embedRead.ts",
+    "library:mentionRegularAll": "ts-node src/scripts/mentionRegularInAllLibraryPosts.ts",
+    "test:regular-mention": "ts-node src/scripts/testRegularMentionMessages.ts"
   },
   "keywords": ["discord", "bot", "boogibooks"],
   "author": "",
