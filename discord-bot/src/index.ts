@@ -298,11 +298,6 @@ client.on(Events.MessageCreate, async (message: Message) => {
 client.on(Events.ThreadCreate, async (thread) => {
   const libraryParentId = getLibraryParentChannelId();
   if (!libraryParentId || thread.parentId !== libraryParentId) return;
-  if (!thread.ownerId) return;
-  if (!isSnowflakeThisMonth(thread.id)) return;
-
-  const owner = await thread.fetchOwner().catch(() => null);
-  if (owner?.user?.bot) return;
 
   // 새 포스트 생성 시 ROLE_REGULAR 멘션 알림 (삭제하지 않음)
   if (ROLE_REGULAR) {
@@ -316,6 +311,13 @@ client.on(Events.ThreadCreate, async (thread) => {
   } else {
     console.warn('[library-thread] ROLE_REGULAR 미설정 — 멘션 알림 스킵');
   }
+
+  // 아래 로직은 서재 활동/책 시드용. ownerId가 비어있는 케이스가 있어, 필터링 없이 가능한 범위에서만 처리.
+  if (!thread.ownerId) return;
+  if (!isSnowflakeThisMonth(thread.id)) return;
+
+  const owner = await thread.fetchOwner().catch(() => null);
+  if (owner?.user?.bot) return;
 
   await pushLibraryActivityToBackend({
     discordUserId: thread.ownerId,
