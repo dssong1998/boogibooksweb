@@ -699,7 +699,10 @@ function SeaCard({
 export function meta() {
   return [
     { title: '부기북스 - 방 선택' },
-    { name: 'description', content: '방을 선택해 입주 신청합니다.' },
+    {
+      name: 'description',
+      content: '여러분이 한 계절동안 머무를 방을 선택합니다.',
+    },
   ];
 }
 

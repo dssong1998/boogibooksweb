@@ -1229,11 +1229,14 @@ export class EventsService {
     });
 
     /* eslint-disable @typescript-eslint/no-unsafe-member-access */
-    const eventTitle = String((application as { event: { title: string } }).event.title);
+    const eventTitle = String(
+      (application as { event: { title: string } }).event.title,
+    );
     const payerUsername = String(
       (application as { user: { username: string } }).user.username,
     );
-    const price = Number((application as { event: { price: unknown } }).event.price) || 0;
+    const price =
+      Number((application as { event: { price: unknown } }).event.price) || 0;
     /* eslint-enable @typescript-eslint/no-unsafe-member-access */
 
     void this.notifyAdminEventParticipantPaid(

@@ -17,7 +17,9 @@ function footerIconUrl(): string {
   return `${base.replace(/\/$/, '')}/logo.png`;
 }
 
-export async function processDiscordDmOutboxOnce(client: Client): Promise<void> {
+export async function processDiscordDmOutboxOnce(
+  client: Client,
+): Promise<void> {
   if (!BOT_SECRET) {
     return;
   }
@@ -85,15 +87,14 @@ async function handleEmbedDm(
     .setTitle(String(p.title ?? ''))
     .setDescription(String(p.description ?? ''))
     .setColor(
-      typeof p.color === 'number'
-        ? p.color
-        : Number(p.color) || 0x7c9070,
+      typeof p.color === 'number' ? p.color : Number(p.color) || 0x7c9070,
     )
     .setTimestamp(new Date());
 
-  const fields = (p.fields as
-    | { name: string; value: string; inline?: boolean }[]
-    | undefined) ?? [];
+  const fields =
+    (p.fields as
+      | { name: string; value: string; inline?: boolean }[]
+      | undefined) ?? [];
   for (const f of fields) {
     if (f?.name != null && f?.value != null) {
       embed.addFields({
@@ -133,10 +134,7 @@ async function handleChannelMemberGrant(
     throw new Error(`channel not found: ${channelId}`);
   }
 
-  if (
-    ch.type !== ChannelType.GuildText &&
-    ch.type !== ChannelType.GuildForum
-  ) {
+  if (ch.type !== ChannelType.GuildText && ch.type !== ChannelType.GuildForum) {
     throw new Error(
       `텍스트·포럼 채널만 지원합니다 (type=${ch.type}). 스레드 ID가 아닌 채널 ID를 저장해 주세요.`,
     );
@@ -165,7 +163,9 @@ async function handleChannelMemberGrant(
   const sendWelcome = p.sendWelcome !== false && !readOnly;
   if (sendWelcome && roomName !== '') {
     if (!ch.isTextBased()) {
-      throw new Error('환영 메시지: 텍스트/포럼 등 메시지 전송 가능한 채널이 아닙니다.');
+      throw new Error(
+        '환영 메시지: 텍스트/포럼 등 메시지 전송 가능한 채널이 아닙니다.',
+      );
     }
     const content = buildChannelWelcomeWithIntro(
       discordUserId,

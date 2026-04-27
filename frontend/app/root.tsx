@@ -8,7 +8,14 @@ import {
 } from "react-router";
 
 import type { Route } from "./+types/root";
+import { buildOpenGraphMeta } from "./lib/shareMeta";
 import "./app.css";
+
+export function meta({}: Route.MetaArgs) {
+  const title =
+    import.meta.env.VITE_OG_TITLE?.trim() || "부기북스";
+  return [{ title }, ...buildOpenGraphMeta()];
+}
 
 export const links: Route.LinksFunction = () => [
   { rel: "preconnect", href: "https://fonts.googleapis.com" },

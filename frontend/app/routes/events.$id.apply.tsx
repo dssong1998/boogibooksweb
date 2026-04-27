@@ -15,7 +15,10 @@ import {
 export function meta({}: Route.MetaArgs) {
   return [
     { title: '부기북스 - 이벤트 신청' },
-    { name: 'description', content: '이벤트 신청하기' },
+    {
+      name: 'description',
+      content: '링크에 접속해 부기북스의 이벤트에 신청하세요!',
+    },
   ];
 }
 
