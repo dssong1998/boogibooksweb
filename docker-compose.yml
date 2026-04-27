@@ -82,13 +82,13 @@ services:
       context: ./frontend
       dockerfile: Dockerfile
       args:
-        - VITE_API_BASE_URL=${VITE_API_BASE_URL:-https://api.boogibooks.com}
-        # 링크 미리보기(OG). 보통 FRONTEND_URL 과 동일한 공개 도메인 — .env 에서 VITE_SITE_URL 로 지정
-        - VITE_SITE_URL=${VITE_SITE_URL:-https://boogibooks.com}
-        - VITE_OG_TITLE=${VITE_OG_TITLE:-}
-        - VITE_OG_DESCRIPTION=${VITE_OG_DESCRIPTION:-}
-        - VITE_OG_IMAGE_URL=${VITE_OG_IMAGE_URL:-}
-        - VITE_OG_IMAGE_PATH=${VITE_OG_IMAGE_PATH:-/쉘하우스.png}
+        # compose 가 빈 build-arg 를 넘기면 Dockerfile ARG 기본값이 무시되므로, Dockerfile 과 동일한 기본값 유지
+        VITE_API_BASE_URL: ${VITE_API_BASE_URL:-https://api.boogibooks.com}
+        VITE_SITE_URL: ${VITE_SITE_URL:-https://boogibooks.com}
+        VITE_OG_TITLE: ${VITE_OG_TITLE:-부기북스}
+        VITE_OG_DESCRIPTION: "${VITE_OG_DESCRIPTION:-읽고 사유하고 쓰고, 다시 돌아와 연결을 만드는 공간 쉘하우스입니다. 이곳에는 그 과정 자체의 즐거움을 함께 체험할 수 있는 따뜻한 사람들이 모입니다.}"
+        VITE_OG_IMAGE_URL: ${VITE_OG_IMAGE_URL:-}
+        VITE_OG_IMAGE_PATH: ${VITE_OG_IMAGE_PATH:-/쉘하우스.png}
     container_name: boogibooks-frontend
     restart: unless-stopped
     depends_on:

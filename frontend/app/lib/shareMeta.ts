@@ -1,8 +1,26 @@
 import type { MetaDescriptor } from "react-router";
 
 const DEFAULT_OG_TITLE = "부기북스";
+/** 로컬 실행 시 — Docker / compose 기본 설명과 동일 */
 const DEFAULT_OG_DESCRIPTION =
-  "책과 사람이 만나는 자리, 부기북스. 모임·서재·디깅클럽 등 함께 읽고 나누는 공간입니다.";
+  "읽고 사유하고 쓰고, 다시 돌아와 연결을 만드는 공간 쉘하우스입니다. 이곳에는 그 과정 자체의 즐거움을 함께 체험할 수 있는 따뜻한 사람들이 모입니다.";
+
+/** public 정적 파일(한글 파일명 포함)의 절대 URL — 일부 크롤러는 경로 UTF-8 인코딩을 요구합니다 */
+export function absoluteUrlForPublicAsset(
+  origin: string,
+  pathname: string,
+): string {
+  const base = origin.replace(/\/$/, "");
+  const raw = pathname.startsWith("/") ? pathname : `/${pathname}`;
+  const encodedPath =
+    "/" +
+    raw
+      .split("/")
+      .filter(Boolean)
+      .map((segment) => encodeURIComponent(segment))
+      .join("/");
+  return `${base}${encodedPath}`;
+}
 
 /** 링크 복사 시 카카오·슬랙·디스코드 등 미리보기용 — `VITE_OG_*` / `VITE_SITE_URL` 로 수정 */
 export function buildOpenGraphMeta(): MetaDescriptor[] {
@@ -16,14 +34,11 @@ export function buildOpenGraphMeta(): MetaDescriptor[] {
   const imagePath =
     import.meta.env.VITE_OG_IMAGE_PATH?.trim() || "/쉘하우스.png";
 
-  let ogImage: string | undefined = imageUrlOverride;
-  if (!ogImage && origin) {
-    try {
-      const path = imagePath.startsWith("/") ? imagePath : `/${imagePath}`;
-      ogImage = new URL(path, `${origin}/`).href;
-    } catch {
-      ogImage = undefined;
-    }
+  let ogImage: string | undefined;
+  if (imageUrlOverride) {
+    ogImage = imageUrlOverride;
+  } else if (origin) {
+    ogImage = absoluteUrlForPublicAsset(origin, imagePath);
   }
 
   const tags: MetaDescriptor[] = [
