@@ -83,6 +83,12 @@ services:
       dockerfile: Dockerfile
       args:
         - VITE_API_BASE_URL=${VITE_API_BASE_URL:-https://api.boogibooks.com}
+        # 링크 미리보기(OG). 보통 FRONTEND_URL 과 동일한 공개 도메인 — .env 에서 VITE_SITE_URL 로 지정
+        - VITE_SITE_URL=${VITE_SITE_URL:-https://boogibooks.com}
+        - VITE_OG_TITLE=${VITE_OG_TITLE:-}
+        - VITE_OG_DESCRIPTION=${VITE_OG_DESCRIPTION:-}
+        - VITE_OG_IMAGE_URL=${VITE_OG_IMAGE_URL:-}
+        - VITE_OG_IMAGE_PATH=${VITE_OG_IMAGE_PATH:-/쉘하우스.png}
     container_name: boogibooks-frontend
     restart: unless-stopped
     depends_on:
