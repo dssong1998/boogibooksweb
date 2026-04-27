@@ -15,6 +15,8 @@ import { LibraryModule } from './library/library.module';
 import { BoogiOutModule } from './boogi-out/boogi-out.module';
 import { PaymentsModule } from './payments/payments.module';
 import { ScheduleModule } from '@nestjs/schedule';
+import { RoomsModule } from './rooms/rooms.module';
+import { DiscordGuildModule } from './discord-guild/discord-guild.module';
 
 @Module({
   imports: [
@@ -31,6 +33,8 @@ import { ScheduleModule } from '@nestjs/schedule';
     DiggingModule,
     SeedModule,
     TableLogsModule,
+    RoomsModule,
+    DiscordGuildModule,
   ],
   controllers: [AppController, AdminController],
   providers: [AppService],

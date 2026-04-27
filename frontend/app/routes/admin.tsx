@@ -13,12 +13,142 @@ import {
   confirmPaidEventApplications,
   navigateHomeRememberingReturn,
   getMe,
+  getAdminRooms,
+  getAdminDiscordChannels,
+  patchAdminRoom,
+  adminAddRoomMember,
+  adminRemoveRoomMember,
+  adminSetRoomCaptain,
+  adminRegisterRoomUser,
+  searchAdminRoomMembers,
   type EventData,
   type MonthlyBookData,
   type ScheduleData,
   type EventApplicationData,
   type UserData,
+  type AdminRoomDetail,
+  type RoomKey,
+  type AdminUserSearchHit,
+  type AdminDiscordChannelOption,
 } from "../lib/api";
+
+function RoomCaptainAssignBlock({
+  room,
+  onRoomUpdated,
+}: {
+  room: AdminRoomDetail;
+  onRoomUpdated: (patch: AdminRoomDetail | null) => void;
+}) {
+  const [query, setQuery] = useState("");
+  const [hits, setHits] = useState<AdminUserSearchHit[]>([]);
+  const [selectedUserId, setSelectedUserId] = useState("");
+  const [loading, setLoading] = useState(false);
+  const [assigning, setAssigning] = useState(false);
+
+  useEffect(() => {
+    setSelectedUserId("");
+  }, [query]);
+
+  useEffect(() => {
+    const q = query.trim();
+    if (q.length < 2) {
+      setHits([]);
+      return;
+    }
+    const t = window.setTimeout(() => {
+      setLoading(true);
+      void searchAdminRoomMembers(q)
+        .then((rows) => setHits(rows))
+        .catch(() => setHits([]))
+        .finally(() => setLoading(false));
+    }, 350);
+    return () => window.clearTimeout(t);
+  }, [query]);
+
+  const assignCaptain = async () => {
+    const u = hits.find((h) => h.id === selectedUserId);
+    if (!u) {
+      alert("방장으로 지정할 사용자를 드롭다운에서 선택해 주세요.");
+      return;
+    }
+    if (
+      !confirm(`「${u.username}」님을 ${room.name} 방의 방장으로 지정할까요?\n(방에 속하지 않은 경우 정원에 여유가 있을 때만 지정됩니다.)`)
+    ) {
+      return;
+    }
+    setAssigning(true);
+    try {
+      const updated = await adminSetRoomCaptain(room.key, u.id);
+      onRoomUpdated(updated);
+      setQuery("");
+      setHits([]);
+      setSelectedUserId("");
+    } catch (e) {
+      console.error(e);
+      alert(
+        e instanceof Error ? e.message : "방장 지정에 실패했습니다.",
+      );
+    } finally {
+      setAssigning(false);
+    }
+  };
+
+  return (
+    <div className="rounded-lg border border-teal-200 dark:border-teal-800 bg-teal-50/50 dark:bg-teal-950/25 p-4 space-y-3">
+      <p className="text-sm font-medium text-gray-900 dark:text-white">
+        방장 지정 (검색 후 드롭다운에서 선택)
+      </p>
+      <p className="text-xs text-gray-600 dark:text-gray-400">
+        부기북스 프로필 이름·Discord 사용자 ID로 검색합니다.{" "}
+        <span className="font-medium text-teal-800 dark:text-teal-300">
+          방 멤버가 아니어도
+        </span>{" "}
+        지정할 수 있습니다(정원이 찬 경우 등은 안내 메시지를 확인하세요).
+      </p>
+      <input
+        type="text"
+        value={query}
+        onChange={(e) => setQuery(e.target.value)}
+        placeholder="2글자 이상 검색..."
+        className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-900 text-sm"
+        autoComplete="off"
+      />
+      {loading ? (
+        <p className="text-xs text-gray-500">검색 중...</p>
+      ) : query.trim().length >= 2 && hits.length === 0 ? (
+        <p className="text-xs text-amber-700 dark:text-amber-400">
+          검색 결과가 없습니다.
+        </p>
+      ) : null}
+      <div>
+        <label className="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">
+          사용자 선택
+        </label>
+        <select
+          value={selectedUserId}
+          onChange={(e) => setSelectedUserId(e.target.value)}
+          className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-900 text-sm text-gray-900 dark:text-white"
+          disabled={hits.length === 0}
+        >
+          <option value="">검색 결과에서 선택...</option>
+          {hits.map((u) => (
+            <option key={u.id} value={u.id}>
+              {u.username} (Discord {u.discordId})
+            </option>
+          ))}
+        </select>
+      </div>
+      <button
+        type="button"
+        disabled={assigning || !selectedUserId}
+        onClick={() => void assignCaptain()}
+        className="w-full py-2 rounded-lg bg-teal-600 text-white text-sm hover:bg-teal-700 disabled:opacity-50 disabled:cursor-not-allowed"
+      >
+        {assigning ? "처리 중..." : "선택한 사용자를 방장으로 지정"}
+      </button>
+    </div>
+  );
+}
 
 export function meta({}: Route.MetaArgs) {
   return [
@@ -30,9 +160,9 @@ export function meta({}: Route.MetaArgs) {
 export default function Admin() {
   const navigate = useNavigate();
   const [user, setUser] = useState<UserData | null>(null);
-  const [activeTab, setActiveTab] = useState<"events" | "books" | "calendar">(
-    "events"
-  );
+  const [activeTab, setActiveTab] = useState<
+    "events" | "books" | "calendar" | "rooms"
+  >("events");
 
   const [events, setEvents] = useState<EventData[]>([]);
   const [monthlyBooks, setMonthlyBooks] = useState<MonthlyBookData[]>([]);
@@ -53,6 +183,26 @@ export default function Admin() {
   const [confirmingPaidAppId, setConfirmingPaidAppId] = useState<string | null>(
     null,
   );
+
+  const [adminRooms, setAdminRooms] = useState<AdminRoomDetail[]>([]);
+  const [roomMetaDraft, setRoomMetaDraft] = useState<
+    Record<string, { introMessage: string; discordChannelId: string }>
+  >({});
+  const [addMemberUserId, setAddMemberUserId] = useState<Record<string, string>>(
+    {},
+  );
+  const [registerDiscordId, setRegisterDiscordId] = useState<
+    Record<string, string>
+  >({});
+  const [registerUsername, setRegisterUsername] = useState<
+    Record<string, string>
+  >({});
+  const [discordChannelOptions, setDiscordChannelOptions] = useState<
+    AdminDiscordChannelOption[]
+  >([]);
+  const [discordChannelsError, setDiscordChannelsError] = useState<
+    string | null
+  >(null);
 
   useEffect(() => {
     const token = localStorage.getItem("auth_token");
@@ -92,6 +242,20 @@ export default function Admin() {
         } else if (activeTab === "calendar") {
           const data = await getAdminSchedules();
           setSchedules(data);
+        } else if (activeTab === "rooms") {
+          const data = await getAdminRooms();
+          setAdminRooms(data);
+          setDiscordChannelsError(null);
+          try {
+            const ch = await getAdminDiscordChannels();
+            setDiscordChannelOptions(ch);
+          } catch (dcErr) {
+            console.error(dcErr);
+            setDiscordChannelOptions([]);
+            setDiscordChannelsError(
+              "디스코드 채널 목록을 불러오지 못했습니다. 백엔드에 DISCORD_BOT_TOKEN·DISCORD_GUILD_ID를 설정했는지 확인하거나, 아래「채널 ID 직접 입력」을 사용하세요.",
+            );
+          }
         }
       } catch (error) {
         console.error("Failed to load data:", error);
@@ -102,6 +266,20 @@ export default function Admin() {
 
     loadData();
   }, [user, activeTab]);
+
+  useEffect(() => {
+    if (activeTab !== "rooms" || adminRooms.length === 0) return;
+    setRoomMetaDraft((prev) => {
+      const next = { ...prev };
+      for (const r of adminRooms) {
+        next[r.key] = {
+          introMessage: r.introMessage,
+          discordChannelId: r.discordChannelId ?? "",
+        };
+      }
+      return next;
+    });
+  }, [adminRooms, activeTab]);
 
   const handleDeleteEvent = async (id: string) => {
     if (!confirm("정말 이 이벤트를 삭제하시겠습니까?")) return;
@@ -133,6 +311,97 @@ export default function Admin() {
     } catch (error) {
       console.error("Failed to delete schedule:", error);
       alert("일정 삭제에 실패했습니다.");
+    }
+  };
+
+  const upsertRoomInState = (updated: AdminRoomDetail | null) => {
+    if (!updated) return;
+    setAdminRooms((rows) =>
+      rows.map((r) => (r.key === updated.key ? updated : r)),
+    );
+  };
+
+  const handleSaveRoomMeta = async (key: RoomKey) => {
+    const draft = roomMetaDraft[key];
+    if (!draft) return;
+    try {
+      const updated = await patchAdminRoom(key, {
+        introMessage: draft.introMessage,
+        discordChannelId:
+          draft.discordChannelId.trim() === ""
+            ? null
+            : draft.discordChannelId.trim(),
+      });
+      upsertRoomInState(updated);
+      alert("저장되었습니다.");
+    } catch (error) {
+      console.error("Failed to save room:", error);
+      alert("방 정보 저장에 실패했습니다.");
+    }
+  };
+
+  const handleAddRoomMember = async (key: RoomKey) => {
+    const uid = (addMemberUserId[key] ?? "").trim();
+    if (!uid) {
+      alert("사용자 ID(UUID)를 입력해 주세요.");
+      return;
+    }
+    try {
+      const updated = await adminAddRoomMember(key, uid);
+      upsertRoomInState(updated);
+      setAddMemberUserId((m) => ({ ...m, [key]: "" }));
+      alert("멤버가 추가되었습니다.");
+    } catch (error) {
+      console.error("Failed to add room member:", error);
+      alert(
+        error instanceof Error ? error.message : "멤버 추가에 실패했습니다.",
+      );
+    }
+  };
+
+  const handleRemoveRoomMember = async (key: RoomKey, userId: string) => {
+    if (!confirm("이 멤버를 방에서 제외할까요?")) return;
+    try {
+      const updated = await adminRemoveRoomMember(key, userId);
+      upsertRoomInState(updated);
+    } catch (error) {
+      console.error("Failed to remove room member:", error);
+      alert("멤버 제외에 실패했습니다.");
+    }
+  };
+
+  const handleSetRoomCaptain = async (key: RoomKey, userId: string) => {
+    if (!confirm("이 멤버를 방장으로 지정할까요?")) return;
+    try {
+      const updated = await adminSetRoomCaptain(key, userId);
+      upsertRoomInState(updated);
+    } catch (error) {
+      console.error("Failed to set captain:", error);
+      alert("방장 지정에 실패했습니다.");
+    }
+  };
+
+  const handleRegisterRoomUser = async (key: RoomKey) => {
+    const did = (registerDiscordId[key] ?? "").trim();
+    const un = (registerUsername[key] ?? "").trim();
+    if (!did || !un) {
+      alert("Discord 사용자 ID와 표시 이름을 입력해 주세요.");
+      return;
+    }
+    try {
+      const updated = await adminRegisterRoomUser(key, {
+        discordId: did,
+        username: un,
+      });
+      upsertRoomInState(updated);
+      setRegisterDiscordId((m) => ({ ...m, [key]: "" }));
+      setRegisterUsername((m) => ({ ...m, [key]: "" }));
+      alert("신규 사용자가 등록되어 방에 배정되었습니다.");
+    } catch (error) {
+      console.error("Failed to register user:", error);
+      alert(
+        error instanceof Error ? error.message : "신규 등록에 실패했습니다.",
+      );
     }
   };
 
@@ -418,6 +687,16 @@ export default function Admin() {
             >
               일정 관리
             </button>
+            <button
+              onClick={() => setActiveTab("rooms")}
+              className={`py-4 px-1 border-b-2 font-medium text-sm ${
+                activeTab === "rooms"
+                  ? "border-teal-600 text-teal-600 dark:text-teal-400"
+                  : "border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300 dark:text-gray-400 dark:hover:text-gray-300"
+              }`}
+            >
+              방 관리
+            </button>
           </nav>
         </div>
 
@@ -649,6 +928,288 @@ export default function Admin() {
                           />
                         </svg>
                       </button>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+        )}
+
+        {activeTab === "rooms" && (
+          <div className="bg-white dark:bg-gray-800 rounded-lg shadow-md p-6">
+            <h2 className="text-xl font-bold text-gray-900 dark:text-white mb-2">
+              방 관리
+            </h2>
+            <p className="text-sm text-gray-600 dark:text-gray-400 mb-6">
+              방장 한 마디·디스코드 채널 ID 설정, 멤버 배정 및 신규 사용자 등록을 할 수
+              있습니다. 채널 ID가 있어야 배정 시 봇이 해당 채널 권한을 부여합니다.
+            </p>
+
+            {loading ? (
+              <div className="text-center py-8">
+                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-teal-600 mx-auto"></div>
+              </div>
+            ) : adminRooms.length === 0 ? (
+              <div className="text-gray-600 dark:text-gray-400 text-center py-8">
+                방 정보를 불러오지 못했습니다.
+              </div>
+            ) : (
+              <div className="space-y-10">
+                {adminRooms.map((room) => {
+                  const draft =
+                    roomMetaDraft[room.key] ?? {
+                      introMessage: room.introMessage,
+                      discordChannelId: room.discordChannelId ?? "",
+                    };
+                  return (
+                    <div
+                      key={room.key}
+                      className="border border-gray-200 dark:border-gray-700 rounded-lg p-5 space-y-4"
+                    >
+                      <div className="flex flex-wrap justify-between gap-2">
+                        <div>
+                          <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
+                            {room.name}{" "}
+                            <span className="text-sm font-normal text-gray-500">
+                              ({room.key})
+                            </span>
+                          </h3>
+                          <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">
+                            멤버 {room.memberCount} / {room.capacity}명
+                            {room.captain ? (
+                              <span className="ml-2">
+                                · 방장 {room.captain.username}
+                              </span>
+                            ) : (
+                              <span className="ml-2 text-amber-700 dark:text-amber-400">
+                                · 방장 미지정
+                              </span>
+                            )}
+                          </p>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => void handleSaveRoomMeta(room.key)}
+                          className="px-4 py-2 bg-teal-600 text-white rounded-lg hover:bg-teal-700 text-sm"
+                        >
+                          소개·채널 저장
+                        </button>
+                      </div>
+
+                      <div>
+                        <label className="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">
+                          방장의 한 마디 (신청 화면에 노출)
+                        </label>
+                        <textarea
+                          value={draft.introMessage}
+                          onChange={(e) =>
+                            setRoomMetaDraft((m) => ({
+                              ...m,
+                              [room.key]: {
+                                ...draft,
+                                introMessage: e.target.value,
+                              },
+                            }))
+                          }
+                          rows={3}
+                          className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-900 text-gray-900 dark:text-white text-sm"
+                        />
+                      </div>
+
+                      <div>
+                        <label className="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">
+                          디스코드 채널 (텍스트·공지·포럼)
+                        </label>
+                        <select
+                          value={draft.discordChannelId}
+                          onChange={(e) =>
+                            setRoomMetaDraft((m) => ({
+                              ...m,
+                              [room.key]: {
+                                ...draft,
+                                discordChannelId: e.target.value,
+                              },
+                            }))
+                          }
+                          className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-900 text-gray-900 dark:text-white text-sm"
+                        >
+                          <option value="">연결 안 함</option>
+                          {draft.discordChannelId.trim() !== "" &&
+                            !discordChannelOptions.some(
+                              (c) => c.id === draft.discordChannelId.trim(),
+                            ) && (
+                              <option value={draft.discordChannelId.trim()}>
+                                현재 저장된 ID (목록에 없음):{" "}
+                                {draft.discordChannelId.trim()}
+                              </option>
+                            )}
+                          {discordChannelOptions.map((ch) => (
+                            <option key={ch.id} value={ch.id}>
+                              {ch.label}
+                            </option>
+                          ))}
+                        </select>
+                        {discordChannelsError ? (
+                          <p className="text-xs text-amber-700 dark:text-amber-400 mt-1">
+                            {discordChannelsError}
+                          </p>
+                        ) : null}
+                        <details className="mt-2">
+                          <summary className="text-xs text-gray-500 dark:text-gray-400 cursor-pointer select-none">
+                            채널 ID 직접 입력
+                          </summary>
+                          <input
+                            type="text"
+                            value={draft.discordChannelId}
+                            onChange={(e) =>
+                              setRoomMetaDraft((m) => ({
+                                ...m,
+                                [room.key]: {
+                                  ...draft,
+                                  discordChannelId: e.target.value,
+                                },
+                              }))
+                            }
+                            placeholder="숫자 채널 ID"
+                            className="mt-2 w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-900 text-gray-900 dark:text-white text-sm font-mono"
+                          />
+                        </details>
+                      </div>
+
+                      <RoomCaptainAssignBlock
+                        room={room}
+                        onRoomUpdated={upsertRoomInState}
+                      />
+
+                      <div>
+                        <p className="text-sm font-medium text-gray-900 dark:text-white mb-2">
+                          멤버
+                        </p>
+                        <ul className="divide-y divide-gray-200 dark:divide-gray-700 border border-gray-200 dark:border-gray-700 rounded-lg overflow-hidden">
+                          {room.members.length === 0 ? (
+                            <li className="px-3 py-4 text-sm text-gray-500 text-center">
+                              멤버가 없습니다.
+                            </li>
+                          ) : (
+                            room.members.map((m) => (
+                              <li
+                                key={m.id}
+                                className="flex flex-wrap items-center justify-between gap-2 px-3 py-2 text-sm bg-gray-50 dark:bg-gray-900/40"
+                              >
+                                <div>
+                                  <span className="font-medium text-gray-900 dark:text-white">
+                                    {m.username}
+                                  </span>
+                                  <span className="text-gray-500 ml-2 font-mono text-xs">
+                                    {m.id.slice(0, 8)}…
+                                  </span>
+                                  <span className="text-gray-400 ml-2 text-xs">
+                                    Discord {m.discordId}
+                                  </span>
+                                  <span className="ml-2 text-xs px-1.5 py-0.5 rounded bg-gray-200 dark:bg-gray-700">
+                                    {m.role}
+                                  </span>
+                                  {room.captain?.id === m.id ? (
+                                    <span className="ml-2 text-xs text-teal-700 dark:text-teal-400">
+                                      방장
+                                    </span>
+                                  ) : null}
+                                </div>
+                                <div className="flex gap-2 shrink-0">
+                                  <button
+                                    type="button"
+                                    onClick={() =>
+                                      void handleSetRoomCaptain(room.key, m.id)
+                                    }
+                                    className="text-xs px-2 py-1 rounded border border-teal-600 text-teal-700 dark:text-teal-400 hover:bg-teal-50 dark:hover:bg-teal-900/30"
+                                  >
+                                    방장 지정
+                                  </button>
+                                  <button
+                                    type="button"
+                                    onClick={() =>
+                                      void handleRemoveRoomMember(room.key, m.id)
+                                    }
+                                    className="text-xs px-2 py-1 rounded border border-red-300 text-red-700 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20"
+                                  >
+                                    제외
+                                  </button>
+                                </div>
+                              </li>
+                            ))
+                          )}
+                        </ul>
+                      </div>
+
+                      <div className="flex flex-wrap gap-2 items-end pt-2 border-t border-gray-100 dark:border-gray-700">
+                        <div className="flex-1 min-w-[200px]">
+                          <label className="block text-xs font-medium text-gray-500 mb-1">
+                            기존 사용자 멤버 추가 (사용자 UUID)
+                          </label>
+                          <input
+                            type="text"
+                            value={addMemberUserId[room.key] ?? ""}
+                            onChange={(e) =>
+                              setAddMemberUserId((prev) => ({
+                                ...prev,
+                                [room.key]: e.target.value,
+                              }))
+                            }
+                            placeholder="xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx"
+                            className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-900 text-sm font-mono"
+                          />
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => void handleAddRoomMember(room.key)}
+                          className="px-4 py-2 bg-gray-900 dark:bg-gray-100 text-white dark:text-gray-900 rounded-lg text-sm hover:opacity-90"
+                        >
+                          멤버 추가
+                        </button>
+                      </div>
+
+                      <div className="flex flex-wrap gap-2 items-end">
+                        <div className="flex-1 min-w-[140px]">
+                          <label className="block text-xs font-medium text-gray-500 mb-1">
+                            신규 디스코드 ID
+                          </label>
+                          <input
+                            type="text"
+                            value={registerDiscordId[room.key] ?? ""}
+                            onChange={(e) =>
+                              setRegisterDiscordId((prev) => ({
+                                ...prev,
+                                [room.key]: e.target.value,
+                              }))
+                            }
+                            className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-900 text-sm font-mono"
+                          />
+                        </div>
+                        <div className="flex-1 min-w-[120px]">
+                          <label className="block text-xs font-medium text-gray-500 mb-1">
+                            표시 이름
+                          </label>
+                          <input
+                            type="text"
+                            value={registerUsername[room.key] ?? ""}
+                            onChange={(e) =>
+                              setRegisterUsername((prev) => ({
+                                ...prev,
+                                [room.key]: e.target.value,
+                              }))
+                            }
+                            className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-900 text-sm"
+                          />
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => void handleRegisterRoomUser(room.key)}
+                          className="px-4 py-2 bg-amber-600 text-white rounded-lg text-sm hover:bg-amber-700"
+                        >
+                          신규 등록 후 배정
+                        </button>
+                      </div>
                     </div>
                   );
                 })}

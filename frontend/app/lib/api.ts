@@ -117,6 +117,130 @@ export interface UserData {
   isTerras?: boolean;
 }
 
+// --- Rooms ---
+export type RoomKey = 'DONG' | 'AEGEAN' | 'GIBRALTAR';
+
+export type RoomSummary = {
+  key: RoomKey;
+  name: string;
+  capacity: number;
+  memberCount: number;
+  introMessage: string;
+};
+
+export function getRooms() {
+  return fetchAPI<RoomSummary[]>('/rooms');
+}
+
+export function applyToRoom(roomKey: RoomKey) {
+  return fetchAPI<{
+    assigned: boolean;
+    roomKey: RoomKey;
+    roomName: string;
+    message: string;
+  }>('/rooms/apply', 'POST', { roomKey });
+}
+
+export function getMyRoom() {
+  return fetchAPI<null | { roomKey: RoomKey; roomName: string; role: string }>(
+    '/rooms/me',
+  );
+}
+
+export type AdminRoomMember = {
+  id: string;
+  username: string;
+  discordId: string;
+  role: string;
+};
+
+export type AdminRoomDetail = {
+  key: RoomKey;
+  name: string;
+  capacity: number;
+  memberCount: number;
+  introMessage: string;
+  discordChannelId: string | null;
+  captainId: string | null;
+  captain: {
+    id: string;
+    username: string;
+    discordId: string;
+  } | null;
+  members: AdminRoomMember[];
+};
+
+export function getAdminRooms() {
+  return fetchAPI<AdminRoomDetail[]>('/admin/rooms');
+}
+
+/** 관리자: 닉네임·Discord ID 부분 검색 (방장 지정 등) */
+export type AdminUserSearchHit = {
+  id: string;
+  username: string;
+  discordId: string;
+};
+
+export function searchAdminRoomMembers(q: string) {
+  const params = new URLSearchParams({ q: q.trim() });
+  return fetchAPI<AdminUserSearchHit[]>(
+    `/admin/rooms/members/search?${params.toString()}`,
+  );
+}
+
+export type AdminDiscordChannelOption = {
+  id: string;
+  name: string;
+  type: number;
+  parentId: string | null;
+  label: string;
+};
+
+export function getAdminDiscordChannels() {
+  return fetchAPI<AdminDiscordChannelOption[]>('/admin/discord/channels');
+}
+
+export function patchAdminRoom(
+  roomKey: RoomKey,
+  body: { introMessage?: string; discordChannelId?: string | null },
+) {
+  return fetchAPI<AdminRoomDetail | null>(`/admin/rooms/${roomKey}`, 'PATCH', body);
+}
+
+export function adminAddRoomMember(roomKey: RoomKey, userId: string) {
+  return fetchAPI<AdminRoomDetail | null>(
+    `/admin/rooms/${roomKey}/members`,
+    'POST',
+    { userId },
+  );
+}
+
+export function adminRemoveRoomMember(roomKey: RoomKey, userId: string) {
+  return fetchAPI<AdminRoomDetail | null>(
+    `/admin/rooms/${roomKey}/members/${userId}`,
+    'DELETE',
+  );
+}
+
+export function adminSetRoomCaptain(roomKey: RoomKey, userId: string) {
+  return fetchAPI<AdminRoomDetail | null>(
+    `/admin/rooms/${roomKey}/captain`,
+    'PATCH',
+    { userId },
+  );
+}
+
+export function adminRegisterRoomUser(
+  roomKey: RoomKey,
+  body: { discordId: string; username: string },
+) {
+  return fetchAPI<AdminRoomDetail | null>(
+    `/admin/rooms/${roomKey}/register-user`,
+    'POST',
+    body,
+  );
+}
+
 export interface EventData {
   id: string;
   title: string;

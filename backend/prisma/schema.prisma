@@ -76,10 +76,60 @@ model User {
   comments              Comment[]
   diggings              Digging[]
   eventApplications     EventApplication[]
+  roomMemberships       RoomMember[]
+  roomsLed              Room[]    @relation("RoomCaptain")
   boogiOutEventsCreated BoogiOutEvent[]
   boogiOutApplications  BoogiOutApplication[]
   createdAt             DateTime  @default(now())
   updatedAt             DateTime  @updatedAt
+}
+
+// 방(3개 중 선택) — 정원 5명 고정(기본값)
+model Room {
+  id              String   @id @default(uuid())
+  key             RoomKey  @unique
+  name            String
+  capacity        Int      @default(5)
+  /** 방 소개 문구(신청 UI — 방장 노출 안 함) */
+  introMessage    String   @default("")
+  /** 디스코드 채널(텍스트) ID: 권한 부여 대상 */
+  discordChannelId String?
+
+  captainId       String?
+  captain         User?    @relation("RoomCaptain", fields: [captainId], references: [id], onDelete: SetNull)
+  /** 첫 MEMBER 입장 시각 — 정원 미달이면 이 시점부터 1시간 후 방장 디스코드 초대 */
+  firstMemberJoinedAt DateTime?
+  /** 방장 디스코드 권한·환영 1회 처리 시각 (정원 충족 또는 첫 입장 후 1시간) */
+  captainDiscordActivatedAt DateTime?
+
+  members         RoomMember[]
+
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+}
+
+model RoomMember {
+  id        String    @id @default(uuid())
+  roomId    String
+  room      Room      @relation(fields: [roomId], references: [id], onDelete: Cascade)
+  userId    String    @unique
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  role      RoomMemberRole @default(MEMBER)
+  createdAt DateTime  @default(now())
+
+  @@unique([roomId, userId])
+  @@index([roomId])
+}
+
+enum RoomKey {
+  DONG
+  AEGEAN
+  GIBRALTAR
+}
+
+enum RoomMemberRole {
+  CAPTAIN
+  MEMBER
 }
 
 // 부깃아웃(BoogiOut) — 커뮤니티 기획 모임 (기존 Event 모델과 별도)

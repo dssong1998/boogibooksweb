@@ -1,6 +1,11 @@
 import axios from 'axios';
 import * as dotenv from 'dotenv';
-import { Client, EmbedBuilder } from 'discord.js';
+import {
+  ChannelType,
+  Client,
+  EmbedBuilder,
+  type GuildChannel,
+} from 'discord.js';
 
 dotenv.config();
 
@@ -39,6 +44,8 @@ export async function processDiscordDmOutboxOnce(client: Client): Promise<void> 
     try {
       if (row.kind === 'EMBED_DM') {
         await handleEmbedDm(client, row.payload);
+      } else if (row.kind === 'CHANNEL_MEMBER_GRANT') {
+        await handleChannelMemberGrant(client, row.payload);
       } else {
         throw new Error(`unknown kind: ${row.kind}`);
       }
@@ -109,4 +116,93 @@ async function handleEmbedDm(
   embed.setFooter({ text: footerText, iconURL: footerIconUrl() });
 
   await user.send({ embeds: [embed] });
+}
+
+async function handleChannelMemberGrant(
+  client: Client,
+  p: Record<string, unknown>,
+): Promise<void> {
+  const discordUserId = String(p.discordUserId ?? '').trim();
+  const channelId = String(p.channelId ?? '').trim();
+  if (!discordUserId || !channelId) {
+    throw new Error('discordUserId or channelId missing');
+  }
+
+  const ch = await client.channels.fetch(channelId);
+  if (!ch) {
+    throw new Error(`channel not found: ${channelId}`);
+  }
+
+  if (
+    ch.type !== ChannelType.GuildText &&
+    ch.type !== ChannelType.GuildForum
+  ) {
+    throw new Error(
+      `텍스트·포럼 채널만 지원합니다 (type=${ch.type}). 스레드 ID가 아닌 채널 ID를 저장해 주세요.`,
+    );
+  }
+
+  const guildCh = ch as GuildChannel;
+  const readOnly = p.readOnly === true;
+  if (readOnly) {
+    await guildCh.permissionOverwrites.edit(discordUserId, {
+      ViewChannel: true,
+      ReadMessageHistory: true,
+      SendMessages: false,
+      AddReactions: false,
+    });
+  } else {
+    await guildCh.permissionOverwrites.edit(discordUserId, {
+      ViewChannel: true,
+      SendMessages: true,
+      AddReactions: true,
+      ReadMessageHistory: true,
+    });
+  }
+
+  const roomName = String(p.roomName ?? '').trim();
+  const introMessage = String(p.introMessage ?? '').trim();
+  const sendWelcome = p.sendWelcome !== false && !readOnly;
+  if (sendWelcome && roomName !== '') {
+    if (!ch.isTextBased()) {
+      throw new Error('환영 메시지: 텍스트/포럼 등 메시지 전송 가능한 채널이 아닙니다.');
+    }
+    const content = buildChannelWelcomeWithIntro(
+      discordUserId,
+      roomName,
+      introMessage,
+    );
+    await ch.send({
+      content,
+      allowedMentions: { users: [discordUserId] },
+    });
+  }
+}
+
+const DISCORD_MSG_MAX = 2000;
+
+function buildChannelWelcomeWithIntro(
+  discordUserId: string,
+  roomName: string,
+  introMessage: string,
+): string {
+  const head = `<@${discordUserId}> 님, **${roomName}** 바다에 오신 것을 환영합니다! 이곳에서 서로의 읽기와 이야기를 나누게 되어 기쁩니다.`;
+  if (introMessage === '') {
+    return head.length > DISCORD_MSG_MAX
+      ? head.slice(0, DISCORD_MSG_MAX - 1) + '…'
+      : head;
+  }
+  const block = `${head}\n\n── 이 바다를 소개합니다 ──\n${introMessage}`;
+  if (block.length <= DISCORD_MSG_MAX) {
+    return block;
+  }
+  const section = '\n\n── 이 바다를 소개합니다 ──\n';
+  const room = head.length + section.length;
+  const maxIntro = Math.max(0, DISCORD_MSG_MAX - room - 1);
+  if (maxIntro < 20) {
+    return head.length > DISCORD_MSG_MAX
+      ? head.slice(0, DISCORD_MSG_MAX - 1) + '…'
+      : head;
+  }
+  return head + section + introMessage.slice(0, maxIntro) + '…';
 }
