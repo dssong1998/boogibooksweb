@@ -24,6 +24,9 @@ function toRoomKey(id: Room): RoomKey {
   return 'GIBRALTAR';
 }
 
+// 방 신청 오픈: 2026-04-30 12:00 (KST)
+const ROOM_APPLY_OPEN_AT_MS = new Date('2026-04-30T12:00:00+09:00').getTime();
+
 /** SSR과 클라이언트 첫 페인트를 일치시켜 hydration 오류를 방지합니다. */
 function subscribeToHydrated(_onStoreChange: () => void): () => void {
   return () => {};
@@ -721,6 +724,9 @@ export default function RoomSelector() {
   }>(null);
   const [error, setError] = useState<string | null>(null);
 
+  const nowMs = Date.now();
+  const isOpen = nowMs >= ROOM_APPLY_OPEN_AT_MS;
+
   const selectedServerRoom = useMemo(() => {
     if (!selected || !rooms) return null;
     const key = toRoomKey(selected);
@@ -761,6 +767,7 @@ export default function RoomSelector() {
   }, [navigate]);
 
   const canApply =
+    isOpen &&
     Boolean(selected) &&
     !isApplying &&
     !myRoom &&
@@ -769,6 +776,10 @@ export default function RoomSelector() {
 
   const handleApply = async () => {
     if (!selected) return;
+    if (!isOpen) {
+      alert('방 신청은 2026년 4월 30일(목) 정오 12:00(KST)부터 가능합니다.');
+      return;
+    }
     if (myRoom) {
       alert(`이미 ${myRoom.roomName} 방에 속해 있습니다.`);
       return;
@@ -811,6 +822,11 @@ export default function RoomSelector() {
         >
           여러분이 머무를 바다를 선택하세요
         </h1>
+        {!isOpen && (
+          <p className='mt-4 text-xs tracking-[0.22em] text-white/40'>
+            방 선택/신청은 2026년 4월 30일(목) 정오 12:00(KST)에 오픈됩니다.
+          </p>
+        )}
       </div>
 
       <div className='w-full max-w-2xl flex flex-col gap-4'>
@@ -820,7 +836,7 @@ export default function RoomSelector() {
           const memberCount = srv?.memberCount ?? null;
           const slotCap = srv?.capacity ?? room.capacity;
           const isFull = srv != null && srv.memberCount >= srv.capacity;
-          const disabled = loading || isFull;
+          const disabled = !isOpen || loading || isFull;
           return (
             <SeaCard
               key={room.id}

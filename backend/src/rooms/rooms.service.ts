@@ -11,6 +11,8 @@ import { PrismaService } from '../prisma/prisma.service';
 const ROOM_CAPACITY_DEFAULT = 5;
 /** 첫 MEMBER 입장 후 방장 디스코드 자동 초대까지 대기 시간 */
 const CAPTAIN_DISCORD_AFTER_FIRST_MEMBER_MS = 60 * 60 * 1000;
+/** 방 선택/신청 오픈 시각 (KST 2026-04-30 12:00) */
+const ROOM_APPLY_OPEN_AT_MS = new Date('2026-04-30T12:00:00+09:00').getTime();
 
 function normalizeRoomKey(raw: string): 'DONG' | 'AEGEAN' | 'GIBRALTAR' {
   const u = String(raw || '')
@@ -588,6 +590,12 @@ export class RoomsService {
   async applyToRoom(userId: string, roomKey: string) {
     const key = normalizeRoomKey(roomKey);
     await this.ensureSeedRooms();
+
+    if (Date.now() < ROOM_APPLY_OPEN_AT_MS) {
+      throw new BadRequestException(
+        '방 신청은 2026년 4월 30일(목) 정오 12:00(KST)부터 가능합니다.',
+      );
+    }
 
     // 이미 방이 있으면 그대로 반환
     // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access
