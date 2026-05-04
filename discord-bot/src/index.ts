@@ -28,6 +28,114 @@ const ADMIN_ID1 = process.env.ADMIN_ID1;
 const ROLE_REGULAR = (process.env.ROLE_REGULAR || '').trim();
 const BACKEND_URL = process.env.BACKEND_API_URL || 'http://localhost:3000';
 
+function sleep(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+async function sendWhenThreadReady(
+  thread: Parameters<Parameters<typeof client.on>[1]>[0],
+  content: string,
+): Promise<void> {
+  // forum thread는 생성 직후 "starter message"가 아직 없는 짧은 구간이 있어
+  // 이때 thread.send()를 호출하면 40058이 발생할 수 있음.
+  const maxAttempts = 10;
+  const delayMs = 1500;
+
+  // join이 필요한 경우(권한/설정)에 대비. 실패해도 계속 시도.
+  await thread.join().catch(() => {});
+
+  for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+    const starter = await thread.fetchStarterMessage().catch(() => null);
+    if (!starter) {
+      await sleep(delayMs);
+      continue;
+    }
+
+    try {
+      await thread.send(content);
+      return;
+    } catch (e: any) {
+      if (e?.code === 40058) {
+        await sleep(delayMs);
+        continue;
+      }
+      throw e;
+    }
+  }
+
+  throw new Error(
+    `[library-thread] thread not ready after ${maxAttempts} attempts`,
+  );
+}
+
+type PendingLibraryThreadNotification = {
+  timeout: NodeJS.Timeout;
+  lastMessageId: string;
+  lastMessageUrl: string;
+  lastAuthorId: string;
+};
+
+const pendingLibraryThreadNotifications = new Map<
+  string,
+  PendingLibraryThreadNotification
+>();
+
+function scheduleLibraryChatNotification(message: Message): void {
+  // 서재 포럼 스레드 "새 댓글" 알림 (디바운스):
+  // - 같은 스레드에서 1분 내 연속 메시지는 알림 1개로 축소
+  // - 마지막 메시지 기준 1분 뒤에도 메시지가 남아있으면 알림 전송
+  // - 알림 메시지는 5초 뒤 삭제
+  if (message.author.bot) return;
+  if (!ROLE_REGULAR) return;
+  if (!isMessageInLibraryChannel(message)) return;
+  if (!message.channel.isThread()) return;
+
+  const threadId = message.channel.id;
+  const existing = pendingLibraryThreadNotifications.get(threadId);
+  if (existing) {
+    clearTimeout(existing.timeout);
+  }
+
+  const timeout = setTimeout(async () => {
+    const pending = pendingLibraryThreadNotifications.get(threadId);
+    pendingLibraryThreadNotifications.delete(threadId);
+    if (!pending) return;
+
+    // 마지막 메시지가 1분 뒤에도 지워지지 않았는지 확인
+    const thread = message.channel;
+    const last = await thread.messages.fetch(pending.lastMessageId).catch(() => null);
+    if (!last) return;
+
+    try {
+      const content =
+        `<@&${ROLE_REGULAR}> 서재에 새로운 글이 올라왔습니다.\n` +
+        `- 작성자: <@${pending.lastAuthorId}>\n` +
+        `- 링크: ${pending.lastMessageUrl}`;
+
+      await sendWhenThreadReady(thread, content);
+
+      setTimeout(async () => {
+        try {
+          const msgs = await thread.messages.fetch({ limit: 10 });
+          const target = msgs.find(
+            (m) => m.author.id === client.user?.id && m.content === content,
+          );
+          await target?.delete().catch(() => {});
+        } catch {}
+      }, 5000);
+    } catch (e) {
+      console.error('[library-thread] 새 댓글 알림 전송 실패:', e);
+    }
+  }, 60_000);
+
+  pendingLibraryThreadNotifications.set(threadId, {
+    timeout,
+    lastMessageId: message.id,
+    lastMessageUrl: message.url,
+    lastAuthorId: message.author.id,
+  });
+}
+
 type NaverBookItem = {
   title: string;
   author: string;
@@ -273,6 +381,7 @@ client.on(Events.MessageCreate, async (message: Message) => {
   }
 
   if (isMessageInLibraryChannel(message)) {
+    scheduleLibraryChatNotification(message);
     await handleBookMessage(message);
     await handleLibraryActivityMessage(message);
 
@@ -298,11 +407,17 @@ client.on(Events.MessageCreate, async (message: Message) => {
 client.on(Events.ThreadCreate, async (thread) => {
   const libraryParentId = getLibraryParentChannelId();
   if (!libraryParentId || thread.parentId !== libraryParentId) return;
+  if (!thread.ownerId) return;
+  if (!isSnowflakeThisMonth(thread.id)) return;
+
+  const owner = await thread.fetchOwner().catch(() => null);
+  if (owner?.user?.bot) return;
 
   // 새 포스트 생성 시 ROLE_REGULAR 멘션 알림 (삭제하지 않음)
   if (ROLE_REGULAR) {
     try {
-      await thread.send(
+      await sendWhenThreadReady(
+        thread,
         `<@&${ROLE_REGULAR}> 여러분께 전송되는 새 책 추가 알림입니다.`,
       );
     } catch (e) {
@@ -311,13 +426,6 @@ client.on(Events.ThreadCreate, async (thread) => {
   } else {
     console.warn('[library-thread] ROLE_REGULAR 미설정 — 멘션 알림 스킵');
   }
-
-  // 아래 로직은 서재 활동/책 시드용. ownerId가 비어있는 케이스가 있어, 필터링 없이 가능한 범위에서만 처리.
-  if (!thread.ownerId) return;
-  if (!isSnowflakeThisMonth(thread.id)) return;
-
-  const owner = await thread.fetchOwner().catch(() => null);
-  if (owner?.user?.bot) return;
 
   await pushLibraryActivityToBackend({
     discordUserId: thread.ownerId,
