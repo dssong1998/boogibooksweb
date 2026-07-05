@@ -7,6 +7,7 @@ import {
   navigateHomeRememberingReturn,
   type MonthlyBookData,
 } from '../lib/api';
+import { formatMultilineText } from '../lib/formatText';
 
 export function meta({}: Route.MetaArgs) {
   return [
@@ -212,8 +213,8 @@ export default function MonthlyBook() {
                           <h3 className='font-semibold text-amber-800 dark:text-amber-300'>
                             💡 이 책을 추천하는 이유
                           </h3>
-                          <p className='text-gray-700 dark:text-gray-300 leading-relaxed'>
-                            {selectedBook.recommendation}
+                          <p className='text-gray-700 dark:text-gray-300 leading-relaxed whitespace-pre-wrap'>
+                            {formatMultilineText(selectedBook.recommendation)}
                           </p>
                         </div>
                       )}
@@ -223,8 +224,8 @@ export default function MonthlyBook() {
                           <h3 className='font-semibold text-gray-900 dark:text-white'>
                             책 소개
                           </h3>
-                          <p className='text-gray-600 dark:text-gray-300 leading-relaxed'>
-                            {selectedBook.description}
+                          <p className='text-gray-600 dark:text-gray-300 leading-relaxed whitespace-pre-wrap'>
+                            {formatMultilineText(selectedBook.description)}
                           </p>
                         </div>
                       )}

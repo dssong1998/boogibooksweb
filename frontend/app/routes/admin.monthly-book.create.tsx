@@ -7,6 +7,7 @@ import {
   getMe,
   navigateHomeRememberingReturn,
 } from "../lib/api";
+import { formatMultilineText } from "../lib/formatText";
 
 export function meta({}: Route.MetaArgs) {
   return [
@@ -79,7 +80,9 @@ export default function AdminMonthlyBookCreate() {
       isbn: book.isbn,
       publisher: book.publisher,
       coverUrl: book.image,
-      description: book.description?.replace(/<\/?b>/g, "") || "",
+      description: book.description
+        ? formatMultilineText(book.description)
+        : "",
     });
     setSearchResults([]);
     setSearchQuery("");
@@ -90,7 +93,15 @@ export default function AdminMonthlyBookCreate() {
     setIsSubmitting(true);
 
     try {
-      await createAdminMonthlyBook(formData);
+      await createAdminMonthlyBook({
+        ...formData,
+        description: formData.description
+          ? formatMultilineText(formData.description)
+          : undefined,
+        recommendation: formData.recommendation
+          ? formatMultilineText(formData.recommendation)
+          : undefined,
+      });
       alert("이달의 책이 설정되었습니다!");
       navigate("/admin");
     } catch (error) {
